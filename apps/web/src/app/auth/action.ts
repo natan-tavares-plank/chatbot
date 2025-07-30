@@ -53,4 +53,6 @@ export async function signOut() {
 	if (error) {
 		return { error: error.message };
 	}
+
+	redirect("/");
 }
