@@ -10,12 +10,11 @@
     "build": "turbo build",
     "lint": "turbo run lint"
   },
-  "dependencies": {},
-	"devDependencies": {
-		"turbo": "^2.5.4",
-		"@biomejs/biome": "^2.0.0",
-		"husky": "^9.1.7",
-		"lint-staged": "^15.5.0"
-	},
+  "devDependencies": {
+    "@biomejs/biome": "^2.1.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.0",
+    "turbo": "^2.5.4"
+  },
   "packageManager": "pnpm@10.13.1"
 }
