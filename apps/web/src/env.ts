@@ -1,7 +1,6 @@
 import z from "zod";
 
 const getEnv = () => {
-	console.log(process.env);
 	const client = () => {
 		const envSchema = z.object({
 			NEXT_PUBLIC_POSTHOG_KEY: z.string(),
@@ -22,8 +21,8 @@ const getEnv = () => {
 	};
 
 	return {
-		client,
-		server,
+		...client(),
+		...server(),
 	};
 };
 

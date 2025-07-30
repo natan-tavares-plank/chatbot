@@ -3,30 +3,53 @@
 import { useState } from "react";
 import { Button, Card, Input, Label, Tabs } from "@/components/ui";
 
-export const AuthForm = () => {
-	const [loginEmail, setLoginEmail] = useState("");
-	const [loginPassword, setLoginPassword] = useState("");
-	const [registerEmail, setRegisterEmail] = useState("");
-	const [registerPassword, setRegisterPassword] = useState("");
-	const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
+type AuthFormProps = {
+	signInAction: (formData: FormData) => Promise<{ error?: string }>;
+	signUpAction: (formData: FormData) => Promise<{ error?: string }>;
+};
 
-	const handleLogin = (e: React.FormEvent) => {
+type Credentials = {
+	email: string;
+	password: string;
+	confirmPassword: string;
+};
+
+export const AuthForm = ({ signInAction, signUpAction }: AuthFormProps) => {
+	const [credentials, setCredentials] = useState<Credentials>({
+		email: "natan.tavares@joinplank.com",
+		password: "123456",
+		confirmPassword: "123456",
+	});
+
+	const handleLogin = async (e: React.FormEvent) => {
 		e.preventDefault();
-		// TODO: Implement login logic
-		console.log("Login attempt:", {
-			email: loginEmail,
-			password: loginPassword,
-		});
+
+		const formData = new FormData();
+		formData.append("email", credentials.email);
+		formData.append("password", credentials.password);
+
+		const { error } = await signInAction(formData);
+		if (error) {
+			console.error(error);
+		}
 	};
 
-	const handleRegister = (e: React.FormEvent) => {
+	const handleRegister = async (e: React.FormEvent) => {
 		e.preventDefault();
-		// TODO: Implement register logic
-		console.log("Register attempt:", {
-			email: registerEmail,
-			password: registerPassword,
-			confirmPassword: registerConfirmPassword,
-		});
+
+		if (credentials.password !== credentials.confirmPassword) {
+			console.error("Passwords do not match");
+			return;
+		}
+
+		const formData = new FormData();
+		formData.append("email", credentials.email);
+		formData.append("password", credentials.password);
+
+		const { error } = await signUpAction(formData);
+		if (error) {
+			console.error(error);
+		}
 	};
 
 	return (
@@ -53,8 +76,10 @@ export const AuthForm = () => {
 									id="login-email"
 									type="email"
 									placeholder="Enter your email"
-									value={loginEmail}
-									onChange={(e) => setLoginEmail(e.target.value)}
+									value={credentials.email}
+									onChange={(e) =>
+										setCredentials({ ...credentials, email: e.target.value })
+									}
 									required
 								/>
 							</div>
@@ -64,8 +89,10 @@ export const AuthForm = () => {
 									id="login-password"
 									type="password"
 									placeholder="Enter your password"
-									value={loginPassword}
-									onChange={(e) => setLoginPassword(e.target.value)}
+									value={credentials.password}
+									onChange={(e) =>
+										setCredentials({ ...credentials, password: e.target.value })
+									}
 									required
 								/>
 							</div>
@@ -83,8 +110,10 @@ export const AuthForm = () => {
 									id="register-email"
 									type="email"
 									placeholder="Enter your email"
-									value={registerEmail}
-									onChange={(e) => setRegisterEmail(e.target.value)}
+									value={credentials.email}
+									onChange={(e) =>
+										setCredentials({ ...credentials, email: e.target.value })
+									}
 									required
 								/>
 							</div>
@@ -94,8 +123,10 @@ export const AuthForm = () => {
 									id="register-password"
 									type="password"
 									placeholder="Create a password"
-									value={registerPassword}
-									onChange={(e) => setRegisterPassword(e.target.value)}
+									value={credentials.password}
+									onChange={(e) =>
+										setCredentials({ ...credentials, password: e.target.value })
+									}
 									required
 								/>
 							</div>
@@ -107,8 +138,13 @@ export const AuthForm = () => {
 									id="register-confirm-password"
 									type="password"
 									placeholder="Confirm your password"
-									value={registerConfirmPassword}
-									onChange={(e) => setRegisterConfirmPassword(e.target.value)}
+									value={credentials.confirmPassword}
+									onChange={(e) =>
+										setCredentials({
+											...credentials,
+											confirmPassword: e.target.value,
+										})
+									}
 									required
 								/>
 							</div>

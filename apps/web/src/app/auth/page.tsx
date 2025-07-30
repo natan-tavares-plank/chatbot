@@ -1,4 +1,5 @@
 import { AuthForm } from "./_components/form";
+import { signIn, signUp } from "./action";
 
 export default async function Page() {
 	return (
@@ -12,7 +13,7 @@ export default async function Page() {
 						Enter the world of intelligent conversations
 					</p>
 
-					<AuthForm />
+					<AuthForm signInAction={signIn} signUpAction={signUp} />
 				</div>
 			</div>
 		</div>
