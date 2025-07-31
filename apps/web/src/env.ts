@@ -15,6 +15,11 @@ const getEnv = () => {
 			SUPABASE_URL: z.url(),
 			SUPABASE_PUBLISHABLE_OR_ANON_KEY: z.string(),
 			DATABASE_PASSWORD: z.string(),
+			OPENAI_API_KEY: z.string(),
+			LANGCHAIN_API_KEY: z.string().optional(),
+			LANGCHAIN_PROJECT: z.string().optional(),
+			LANGCHAIN_ENDPOINT: z.url().optional(),
+			LANGCHAIN_TRACING_V2: z.string().optional(),
 		});
 
 		return envSchema.parse(process.env);
