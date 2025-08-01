@@ -1,136 +1,56 @@
-import { PromptTemplate } from "@langchain/core/prompts";
-import { ChatOpenAI } from "@langchain/openai";
-import type { Message as VercelChatMessage } from "ai";
 import { type NextRequest, NextResponse } from "next/server";
-import { env } from "@/env";
-import "@/lib/langsmith"; // Import LangSmith configuration
+import "@/lib/langgraph/langsmith"; // Import LangSmith configuration
+import { agent } from "@/lib/langgraph/agents/graph";
 
 export const runtime = "edge";
-
-// Configure LangSmith for observability
-if (process.env.LANGCHAIN_TRACING_V2) {
-	process.env.LANGCHAIN_PROJECT =
-		process.env.LANGCHAIN_PROJECT || "captain-byte-chatbot";
-}
-
-const formatMessage = (message: VercelChatMessage) => {
-	return `${message.role}: ${message.content}`;
-};
-
-// Multi-agent prompt templates
-const AGENT_TEMPLATES = {
-	chat: `You are a pirate named Captain Byte. All responses must be extremely verbose and in pirate dialect. Be witty, entertaining, and helpful.
-
-Current conversation:
-{chat_history}
-
-User: {input}
-AI:`,
-
-	weather: `You are a weather-savvy pirate named Captain Byte. Provide weather information in pirate dialect. If the user asks about weather, give a detailed, entertaining weather report. For other topics, redirect to general chat.
-
-Current conversation:
-{chat_history}
-
-User: {input}
-AI:`,
-
-	news: `You are a news-savvy pirate named Captain Byte. Provide news updates in pirate dialect. If the user asks about news, give interesting current events. For other topics, redirect to general chat.
-
-Current conversation:
-{chat_history}
-
-User: {input}
-AI:`,
-};
-
-// Agent detection logic
-const detectAgent = (input: string): keyof typeof AGENT_TEMPLATES => {
-	const lowerInput = input.toLowerCase();
-
-	if (
-		lowerInput.includes("weather") ||
-		lowerInput.includes("forecast") ||
-		lowerInput.includes("temperature")
-	) {
-		return "weather";
-	}
-
-	if (
-		lowerInput.includes("news") ||
-		lowerInput.includes("current events") ||
-		lowerInput.includes("latest")
-	) {
-		return "news";
-	}
-
-	return "chat";
-};
 
 export async function POST(req: NextRequest) {
 	try {
 		const body = await req.json();
-		const messages = body.messages ?? [];
-		const formattedPreviousMessages = messages.slice(0, -1).map(formatMessage);
-		const currentMessageContent = messages[messages.length - 1].content;
+		const bodyMessages = body.messages ?? [];
+		if (bodyMessages.length === 0) {
+			return NextResponse.json(
+				{ error: "No messages provided" },
+				{ status: 400 },
+			);
+		}
 
-		// Detect which agent to use based on user input
-		const agentType = detectAgent(currentMessageContent);
-		const template = AGENT_TEMPLATES[agentType];
+		const currentMessageContent = bodyMessages[bodyMessages.length - 1].content;
 
-		const prompt = PromptTemplate.fromTemplate(template);
-
-		const model = new ChatOpenAI({
-			apiKey: env.OPENAI_API_KEY,
-			temperature: 0.8,
-			model: "gpt-4o-mini",
-			// Add metadata for LangSmith tracking
-			tags: [`agent:${agentType}`],
-			metadata: {
-				agent_type: agentType,
-				user_id: body.userId || "anonymous",
-			},
-		});
-
-		// Get the full response first, then stream it properly
-		const response = await model.invoke([
-			{
-				role: "system",
-				content: template,
-			},
-			{
-				role: "user",
-				content: `Chat History: ${formattedPreviousMessages.join("\n")}\n\nCurrent Message: ${currentMessageContent}`,
-			},
-		]);
-
-		const content = response.content as string;
-
-		// Create a simple stream that sends the content in chunks
 		const readableStream = new ReadableStream({
 			async start(controller) {
 				try {
-					// Split content into words and stream them
-					const words = content.split(" ");
-					let currentContent = "";
+					const stream = await agent.stream({
+						messages: [
+							{
+								role: "user",
+								content: currentMessageContent,
+							},
+						],
+					});
 
-					for (const word of words) {
-						currentContent += (currentContent ? " " : "") + word;
+					for await (const chunk of stream) {
+						for (const agentKey in chunk) {
+							const update = chunk[agentKey as keyof typeof chunk];
 
-						// Send each word as a chunk with proper format
-						const data = `data: ${JSON.stringify({
-							id: Date.now().toString(),
-							role: "assistant",
-							content: currentContent,
-						})}\n\n`;
-
-						controller.enqueue(new TextEncoder().encode(data));
-
-						// Add a small delay to simulate streaming
-						await new Promise((resolve) => setTimeout(resolve, 30));
+							if (Array.isArray(update)) {
+								const lastMessage = update[update.length - 1];
+								if (lastMessage.content) {
+									controller.enqueue(
+										new TextEncoder().encode(
+											`data: ${JSON.stringify({ content: lastMessage.content })}\n\n`,
+										),
+									);
+								}
+							} else if (update && "content" in update) {
+								controller.enqueue(
+									new TextEncoder().encode(
+										`data: ${JSON.stringify({ content: update.content })}\n\n`,
+									),
+								);
+							}
+						}
 					}
-
-					// Send the end signal
 					controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
 					controller.close();
 				} catch (error) {
@@ -146,7 +66,7 @@ export async function POST(req: NextRequest) {
 				"Cache-Control": "no-cache",
 				Connection: "keep-alive",
 				// Add agent type to headers for frontend
-				"X-Agent-Type": agentType,
+				"X-Agent-Type": "chat",
 			},
 		});
 	} catch (e: unknown) {

@@ -51,13 +51,21 @@ const ChatBot = () => {
 		},
 	});
 
-	console.log({ messages, error });
-
 	const handleSendMessage = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!input.trim() || isLoading) return;
 
-		handleSubmit(e);
+		handleSubmit(e, {
+			body: {
+				userId: "123",
+				messages: [
+					{
+						role: "user",
+						content: input,
+					},
+				],
+			},
+		});
 	};
 
 	// Auto-scroll to bottom when messages change
