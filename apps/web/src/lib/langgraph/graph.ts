@@ -1,7 +1,7 @@
 import { MessagesAnnotation, StateGraph } from "@langchain/langgraph";
-import { newsAgent } from "./news";
-import { supervisorAgent } from "./supervisor";
-import { weatherAgent } from "./weather";
+import { newsAgent } from "./agents/news";
+import { supervisorAgent } from "./agents/supervisor";
+import { weatherAgent } from "./agents/weather";
 
 const graph = new StateGraph(MessagesAnnotation)
 	.addNode("supervisor", supervisorAgent, {
