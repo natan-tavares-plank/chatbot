@@ -1,10 +1,22 @@
 {
 	"ui": "tui",
-  "tasks": {
-    "build": {
+	"tasks": {
+		"build": {
 			"dependsOn": ["^build"],
 			"inputs": ["$TURBO_DEFAULT$", ".env*"],
-			"outputs": ["dist/**"]
+			"outputs": ["dist/**"],
+			"env": [
+				"SUPABASE_URL",
+				"SUPABASE_PUBLISHABLE_OR_ANON_KEY",
+				"DATABASE_PASSWORD",
+				"NEXT_PUBLIC_POSTHOG_KEY",
+				"NEXT_PUBLIC_POSTHOG_HOST",
+				"LANGCHAIN_TRACING",
+				"LANGCHAIN_API_KEY",
+				"LANGCHAIN_ENDPOINT",
+				"LANGCHAIN_PROJECT",
+				"OPENAI_API_KEY"
+			]
 		},
 		"lint": {
 			"dependsOn": ["^lint"]
@@ -13,5 +25,5 @@
 			"cache": false,
 			"persistent": true
 		}
-  }
-} 
+	}
+}
