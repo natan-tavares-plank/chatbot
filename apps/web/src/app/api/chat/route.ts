@@ -1,106 +1,120 @@
 import { type NextRequest, NextResponse } from "next/server";
-import "@/lib/langgraph/langsmith"; // Import LangSmith configuration
-import { agent } from "@/lib/langgraph/agents/graph";
+import "@/lib/langgraph/langsmith";
+import { AIMessage, HumanMessage } from "@langchain/core/messages";
+import { agent } from "@/lib/langgraph/graph";
+import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
 	try {
-		const body = await req.json();
-		const bodyMessages = body.messages ?? [];
-		if (bodyMessages.length === 0) {
-			return NextResponse.json(
-				{ error: "No messages provided" },
-				{ status: 400 },
-			);
+		const { auth } = await createClient();
+		const {
+			data: { user },
+		} = await auth.getUser();
+		if (!user?.id) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
-		const currentMessageContent = bodyMessages[bodyMessages.length - 1].content;
+		const { messages } = await req.json();
+		if (!messages?.length) {
+			return NextResponse.json({ error: "No messages" }, { status: 400 });
+		}
 
-		const readableStream = new ReadableStream({
+		const langChainMessages = messages.map((msg: any) =>
+			msg.role === "user"
+				? new HumanMessage(msg.content)
+				: new AIMessage({ content: msg.content, name: msg.agent_name }),
+		);
+
+		// Create stream
+		const stream = new ReadableStream({
 			async start(controller) {
 				try {
-					const stream = await agent.stream({
-						messages: [
-							{
-								role: "user",
-								content: currentMessageContent,
+					const agentStream = await agent.stream(
+						{ messages: langChainMessages },
+						{
+							configurable: {
+								conversation_id: crypto.randomUUID(),
+								user_id: user.id,
 							},
-						],
-					});
+						},
+					);
 
-					for await (const chunk of stream) {
-						for (const agentKey in chunk) {
-							const update = chunk[agentKey as keyof typeof chunk];
+					const processed = new Set<string>();
 
-							if (Array.isArray(update)) {
-								const lastMessage = update[update.length - 1];
-								if (lastMessage.content) {
-									controller.enqueue(
-										new TextEncoder().encode(
-											`data: ${JSON.stringify({ content: lastMessage.content })}\n\n`,
-										),
-									);
-								}
-							} else if (update && "content" in update) {
-								controller.enqueue(
-									new TextEncoder().encode(
-										`data: ${JSON.stringify({ content: update.content })}\n\n`,
-									),
-								);
+					for await (const chunk of agentStream) {
+						const content = extractNewContent(chunk, processed);
+						if (content) {
+							for (const char of content) {
+								controller.enqueue(new TextEncoder().encode(char));
+								await new Promise((resolve) => setTimeout(resolve, 5));
 							}
 						}
 					}
-					controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+
 					controller.close();
 				} catch (error) {
-					console.error("Streaming error:", error);
+					console.error("Stream error:", error);
 					controller.error(error);
 				}
 			},
 		});
 
-		return new Response(readableStream, {
+		return new Response(stream, {
 			headers: {
 				"Content-Type": "text/event-stream",
 				"Cache-Control": "no-cache",
 				Connection: "keep-alive",
-				// Add agent type to headers for frontend
-				"X-Agent-Type": "chat",
 			},
 		});
-	} catch (e: unknown) {
-		console.error("Chat API error:", e);
-
-		if (e instanceof Error) {
-			// Handle specific OpenAI errors
-			if (e.message.includes("401")) {
-				return NextResponse.json(
-					{ error: "Invalid API key. Please check your OpenAI configuration." },
-					{ status: 401 },
-				);
-			}
-
-			if (e.message.includes("429")) {
-				return NextResponse.json(
-					{ error: "Rate limit exceeded. Please try again later." },
-					{ status: 429 },
-				);
-			}
-
-			if (e.message.includes("500")) {
-				return NextResponse.json(
-					{ error: "OpenAI service error. Please try again." },
-					{ status: 503 },
-				);
-			}
-
-			return NextResponse.json({ error: e.message }, { status: 500 });
-		}
-
+	} catch (error) {
+		console.error("API error:", error);
 		return NextResponse.json(
-			{ error: "Unknown error occurred" },
+			{ error: "Internal server error" },
 			{ status: 500 },
 		);
 	}
+}
+
+// Simple content extraction - just get the latest content from any format
+function extractNewContent(chunk: any, processed: Set<string>): string | null {
+	// Try to find content in various chunk formats
+	const content = findContentInChunk(chunk);
+	if (!content || processed.has(content)) return null;
+
+	processed.add(content);
+	return content;
+}
+
+function findContentInChunk(chunk: any): string | null {
+	// Handle different chunk formats
+	if (typeof chunk === "string") return chunk;
+	if (chunk?.content) return String(chunk.content);
+
+	// Look for messages array
+	if (Array.isArray(chunk)) {
+		const lastMsg = chunk[chunk.length - 1];
+		return lastMsg?.content ? String(lastMsg.content) : null;
+	}
+
+	// Look through object keys
+	for (const value of Object.values(chunk || {})) {
+		if (value && typeof value === "object" && "content" in value) {
+			return String((value as any).content);
+		}
+		if (Array.isArray(value)) {
+			const lastMsg = value[value.length - 1];
+			if (lastMsg?.content) return String(lastMsg.content);
+		}
+		if (value && typeof value === "object" && "messages" in value) {
+			const messages = (value as any).messages;
+			if (Array.isArray(messages)) {
+				const lastMsg = messages[messages.length - 1];
+				if (lastMsg?.content) return String(lastMsg.content);
+			}
+		}
+	}
+
+	return null;
 }

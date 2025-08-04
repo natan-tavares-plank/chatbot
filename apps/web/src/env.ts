@@ -20,6 +20,8 @@ const getEnv = () => {
 			LANGCHAIN_PROJECT: z.string().optional(),
 			LANGCHAIN_ENDPOINT: z.url().optional(),
 			LANGCHAIN_TRACING_V2: z.string().optional(),
+			OPENWEATHER_API_KEY: z.string(),
+			NEWSAPI_API_KEY: z.string(),
 		});
 
 		return envSchema.parse(process.env);

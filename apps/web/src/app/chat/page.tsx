@@ -55,17 +55,7 @@ const ChatBot = () => {
 		e.preventDefault();
 		if (!input.trim() || isLoading) return;
 
-		handleSubmit(e, {
-			body: {
-				userId: "123",
-				messages: [
-					{
-						role: "user",
-						content: input,
-					},
-				],
-			},
-		});
+		handleSubmit(e);
 	};
 
 	// Auto-scroll to bottom when messages change
@@ -73,7 +63,7 @@ const ChatBot = () => {
 		if (scrollAreaRef.current) {
 			scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
 		}
-	}, [messages]);
+	});
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
