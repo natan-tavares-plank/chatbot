@@ -1,9 +1,13 @@
 import type { BaseMessage } from "@langchain/core/messages";
-import { Annotation, StateGraph } from "@langchain/langgraph";
+import {
+	Annotation,
+	StateGraph,
+} from "@langchain/langgraph";
 import { routerNode } from "./agents";
-import { captainByteAgent } from "./agents/captain.agent";
+import { chatAgent } from "./agents/chat.agent";
 import { newsAgent } from "./agents/news.agent";
 import { weatherAgent } from "./agents/weather.agent";
+
 
 const StateAnnotation = Annotation.Root({
 	messages: Annotation<BaseMessage[]>({
@@ -14,7 +18,19 @@ const StateAnnotation = Annotation.Root({
 	}),
 	goto: Annotation<string>({
 		value: (_existing, update) => update,
-		default: () => "captain_byte",
+		default: () => "chat_agent",
+	}),
+	weather_data: Annotation<string | null>({
+		value: (_existing, update) => update,
+		default: () => null,
+	}),
+	news_data: Annotation<string | null>({
+		value: (_existing, update) => update,
+		default: () => null,
+	}),
+	current_agent: Annotation<string>({
+		value: (_existing, update) => update,
+		default: () => "",
 	}),
 });
 
@@ -22,20 +38,23 @@ const graph = new StateGraph(StateAnnotation)
 	.addNode("router", routerNode)
 
 	// Agent nodes
-	.addNode("captain_byte", captainByteAgent)
+	.addNode("chat_agent", chatAgent)
 	.addNode("news_agent", newsAgent)
 	.addNode("weather_agent", weatherAgent)
 
 	// edges
 	.addEdge("__start__", "router")
+
 	.addConditionalEdges("router", (state) => state.goto, {
-		captain_byte: "captain_byte",
+		chat_agent: "chat_agent",
 		weather_agent: "weather_agent",
 		news_agent: "news_agent",
-		default: "captain_byte",
+		default: "chat_agent",
 	})
-	.addEdge("news_agent", "captain_byte")
-	.addEdge("weather_agent", "captain_byte")
-	.addEdge("captain_byte", "__end__");
+
+	.addEdge("weather_agent", "chat_agent")
+	.addEdge("news_agent", "chat_agent")
+
+	.addEdge("chat_agent", "__end__");
 
 export const agent = graph.compile();

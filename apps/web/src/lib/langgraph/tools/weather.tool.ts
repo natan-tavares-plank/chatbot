@@ -11,16 +11,17 @@ export const weatherTool = tool(
 		);
 		const data = await response.json();
 
-		console.log(data);
-
-		return data;
+		const temp = data.main?.temp ?? "unknown";
+		const description = data.weather?.[0]?.description ?? "no data";
+		return `The weather in ${query} is ${temp}°C with ${description}.`;
 	},
 	{
-		name: "weather",
-		description: "Call to get the weather.",
+		name: "weather_tool",
+		description: "Call to get the weather data.",
 		returnDirect: true,
 		schema: z.object({
 			query: z.string().describe("The city to get the weather."),
 		}),
+		responseFormat: "content",
 	},
 );

@@ -9,7 +9,10 @@ import z from "zod";
 import { env } from "../../../env";
 import type { ChatState } from "../types";
 
-const llm = new ChatOpenAI({
+/**
+ * This is the base LLM that all agents use.
+ */
+export const llm = new ChatOpenAI({
 	openAIApiKey: env.OPENAI_API_KEY,
 	model: "gpt-4o-mini",
 	temperature: 0,
@@ -20,6 +23,7 @@ const llm = new ChatOpenAI({
  * @param params.name - The name of the agent.
  * @param params.destinations - The possible destinations for the agent.
  * @param params.systemPrompt - The system prompt for the agent.
+ * @param params.tools - Optional tools that this agent can use.
  * @returns - The agent node.
  */
 export const makeAgentNode = (params: {
@@ -53,7 +57,7 @@ export const makeAgentNode = (params: {
 
 		const response = await llm
 			.withStructuredOutput(responseSchema, {
-				name: "router",
+				name: params.name,
 			})
 			.invoke(messages);
 
@@ -80,11 +84,11 @@ export const makeAgentNode = (params: {
 export const routerNode = async (state: ChatState) => {
 	const systemPrompt = new SystemMessage(
 		[
-			"Classify the user's query into one of the following: 'weather_agent', 'news_agent', 'captain_byte'.",
-			"Valid destinations are: 'weather_agent', 'news_agent', 'captain_byte'.",
+			"Classify the user's query into one of the following: 'weather_agent', 'news_agent', 'chat_agent'.",
+			"Valid destinations are: 'weather_agent', 'news_agent', 'chat_agent'.",
 			"If the user asks about weather conditions, forecasts, or climate, direct them to the 'weather_agent'.",
 			"If the user asks about current events, news, or recent happenings, direct them to the 'news_agent'.",
-			"For general conversation asks, direct them to the 'captain_byte'.",
+			"For general conversation asks, direct them to the 'chat_agent'.",
 			"You must return just the destination on the goto field.",
 		].join(" "),
 	);
@@ -94,15 +98,15 @@ export const routerNode = async (state: ChatState) => {
 	const lastMessage = humanMessages[humanMessages.length - 1];
 
 	if (!lastMessage) {
-		console.log("No human message found, defaulting to captain_byte");
-		return { goto: "captain_byte" };
+		console.log("No human message found, defaulting to chat_agent");
+		return { goto: "chat_agent" };
 	}
 
 	console.log("Router analyzing message:", lastMessage.content);
 
 	const responseSchema = z.object({
 		goto: z
-			.enum(["weather_agent", "news_agent", "captain_byte"])
+			.enum(["weather_agent", "news_agent", "chat_agent"])
 			.describe("The next agent to call. Must be one of the specified values."),
 	});
 

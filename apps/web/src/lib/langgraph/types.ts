@@ -5,4 +5,6 @@ export type ChatState = typeof MessagesAnnotation.State & {
 	summary?: string;
 	current_agent?: string;
 	route?: "weather_agent" | "news_agent" | "captain_byte";
+	weather_data: string | null;
+	news_data: string | null;
 };

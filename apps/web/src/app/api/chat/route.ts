@@ -32,10 +32,12 @@ export async function POST(req: NextRequest) {
 			async start(controller) {
 				try {
 					const agentStream = await agent.stream(
-						{ messages: langChainMessages },
+						{
+							messages: langChainMessages,
+						},
 						{
 							configurable: {
-								conversation_id: crypto.randomUUID(),
+								// conversation_id: crypto.randomUUID(),
 								user_id: user.id,
 							},
 						},
