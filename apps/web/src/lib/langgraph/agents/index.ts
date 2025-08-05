@@ -25,6 +25,7 @@ export const llm = new ChatOpenAI({
  * @param params.systemPrompt - The system prompt for the agent.
  * @param params.tools - Optional tools that this agent can use.
  * @returns - The agent node.
+ * @deprecated - It's not used anymore.
  */
 export const makeAgentNode = (params: {
 	name: string;

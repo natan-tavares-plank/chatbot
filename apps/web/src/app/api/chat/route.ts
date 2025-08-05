@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import "@/lib/langgraph/langsmith";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
-import { agent } from "@/lib/langgraph/graph";
+import { createAgentWithMemory } from "@/lib/langgraph/agent-factory";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "edge";
@@ -21,23 +21,40 @@ export async function POST(req: NextRequest) {
 			return NextResponse.json({ error: "No messages" }, { status: 400 });
 		}
 
-		const langChainMessages = messages.map((msg: any) =>
-			msg.role === "user"
-				? new HumanMessage(msg.content)
-				: new AIMessage({ content: msg.content, name: msg.agent_name }),
+		// Convert messages to LangChain format
+		const langChainMessages = messages.map(
+			(msg: { role: string; content: string; agent_name?: string }) =>
+				msg.role === "user"
+					? new HumanMessage(msg.content)
+					: new AIMessage({
+							content: msg.content,
+							name: msg.agent_name,
+						}),
 		);
+
+		// Option 1: Use the current agent with MemorySaver (current implementation)
+		// const currentAgent = agent;
+
+		// Option 2: Use agent with database persistence (uncomment to enable)
+		const { agent: currentAgent, memoryManager } = await createAgentWithMemory(
+			user.id,
+		);
+
+		// Load previous state from database
+		const previousState = await memoryManager.loadState();
+		if (previousState.messages?.length) {
+			langChainMessages.unshift(...previousState.messages);
+		}
 
 		// Create stream
 		const stream = new ReadableStream({
 			async start(controller) {
 				try {
-					const agentStream = await agent.stream(
-						{
-							messages: langChainMessages,
-						},
+					const agentStream = await currentAgent.stream(
+						{ messages: langChainMessages },
 						{
 							configurable: {
-								// conversation_id: crypto.randomUUID(),
+								thread_id: user.id,
 								user_id: user.id,
 							},
 						},
@@ -53,6 +70,14 @@ export async function POST(req: NextRequest) {
 								await new Promise((resolve) => setTimeout(resolve, 5));
 							}
 						}
+					}
+
+					// Option: Persist final state to database (uncomment when using MemoryManager)
+					const finalState = await currentAgent.getState({
+						configurable: { thread_id: user.id },
+					});
+					if (memoryManager && finalState?.values) {
+						await memoryManager.persistState(finalState.values);
 					}
 
 					controller.close();

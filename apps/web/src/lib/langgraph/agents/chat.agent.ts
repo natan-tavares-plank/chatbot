@@ -1,8 +1,15 @@
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import { Command } from "@langchain/langgraph";
+import { ChatOpenAI } from "@langchain/openai";
 import z from "zod";
+import { env } from "../../../env";
 import type { ChatState } from "../types";
-import { llm } from ".";
+
+const llm = new ChatOpenAI({
+	openAIApiKey: env.OPENAI_API_KEY,
+	model: "gpt-4o-mini",
+	temperature: 0.7,
+});
 
 const systemPrompt = [
 	"You are Captain Byte, an funny pirate with a crew of specialists.",
