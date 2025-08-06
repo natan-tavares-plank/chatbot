@@ -17,8 +17,6 @@ const systemPrompt = [
 	"Always maintain your pirate character while being helpful.",
 	"Use nautical metaphors and pirate terminology when appropriate.",
 	"You are the final agent in the chain. You will be given the weather and news data and you will use it to provide a final response.",
-	"You must go to the __end__ node when you are done.",
-	"IMPORTANT: You MUST always provide a detailed, helpful response. Never return empty content.",
 	"When given news data, summarize the news in your pirate style and provide insights.",
 	"When given weather data, describe the weather conditions in your pirate style.",
 ].join(" ");
@@ -26,6 +24,7 @@ const systemPrompt = [
 export const chatAgent = async (state: ChatState): Promise<Command> => {
 	let contextualPrompt = systemPrompt;
 
+	// the model should be able to choose to use the weather and news data or not
 	if (state.weather_data) {
 		contextualPrompt += ` Weather information has been gathered: ${state.weather_data}. Use this information to provide an accurate weather response.`;
 	}
@@ -34,7 +33,21 @@ export const chatAgent = async (state: ChatState): Promise<Command> => {
 		contextualPrompt += ` News information has been gathered: ${state.news_data}. Use this information to provide an accurate news response.`;
 	}
 
-	const messages = [new SystemMessage(contextualPrompt), ...state.messages];
+	const recentMessages = state.messages.slice(-4);
+	const messagesToSend = [new SystemMessage(contextualPrompt)];
+
+	if (state.summary) {
+		messagesToSend.push(
+			new AIMessage({
+				content: `CONVERSATION CONTEXT: ${state.summary}`,
+				name: "context",
+			}),
+		);
+	}
+
+	messagesToSend.push(
+		...recentMessages.filter((msg) => msg.content.toString().trim()),
+	);
 
 	const responseSchema = z.object({
 		response: z
@@ -51,23 +64,20 @@ export const chatAgent = async (state: ChatState): Promise<Command> => {
 			.withStructuredOutput(responseSchema, {
 				name: "chat_agent",
 			})
-			.invoke(messages);
+			.invoke(messagesToSend);
 	} catch (error) {
 		console.error(
 			"Structured output failed, falling back to regular LLM call:",
 			error,
 		);
 
-		// Fallback: try without structured output
-		const fallbackResponse = await llm.invoke(messages);
-
+		const fallbackResponse = await llm.invoke(messagesToSend);
 		const fallbackContent = String(fallbackResponse.content || "");
 		if (fallbackContent.trim()) {
 			response = {
 				response: fallbackContent,
 			};
 		} else {
-			// If even the fallback is empty, provide a default response based on available data
 			let defaultResponse =
 				"Arr matey! I seem to have lost me bearings. Could ye repeat that question?";
 
@@ -89,7 +99,7 @@ export const chatAgent = async (state: ChatState): Promise<Command> => {
 	});
 
 	return new Command({
-		goto: "__end__",
+		// goto: "summarize_conversation",
 		update: {
 			messages: [aiMessage],
 			current_agent: "chat_agent",

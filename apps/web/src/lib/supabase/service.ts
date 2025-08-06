@@ -20,33 +20,34 @@ export class ChatService {
 	}
 
 	async saveMessages(chatId: string, messages: Message[]) {
-		console.log("💬 Processing messages for chat:", chatId);
-		console.log(
-			"📊 Message types:",
-			messages.map((msg) => msg._getType()),
+		const existingMessages = await this.getMessages(chatId);
+		const existingContents = new Set(
+			existingMessages.map((msg) => msg.content),
 		);
 
-		const messagesToInsert = messages.map((msg) => ({
-			chat_id: chatId,
-			role: msg._getType() === "human" ? "user" : "assistant",
-			content:
-				typeof msg.content === "string"
-					? msg.content
-					: JSON.stringify(msg.content),
-		}));
+		const messagesToInsert = messages
+			.filter((msg) => msg.content.toString().trim())
+			.map((msg) => ({
+				chat_id: chatId,
+				role: msg._getType() === "human" ? "user" : "assistant",
+				content:
+					typeof msg.content === "string"
+						? msg.content
+						: JSON.stringify(msg.content),
+			}))
+			.filter((msg) => !existingContents.has(msg.content));
 
-		console.log("🗂️ Messages to insert:", messagesToInsert);
+		if (messagesToInsert.length === 0) {
+			return;
+		}
 
 		const { error } = await this.supabase
 			.from("messages")
 			.insert(messagesToInsert);
 
 		if (error) {
-			console.error("💥 Database insert error:", error);
 			throw error;
 		}
-
-		console.log("✅ Database insert successful");
 	}
 
 	async getMessages(chatId: string) {
@@ -61,9 +62,10 @@ export class ChatService {
 	}
 
 	async saveSummary(chatId: string, summaryText: string) {
-		const { error } = await this.supabase
-			.from("summaries")
-			.upsert({ chat_id: chatId, summary_text: summaryText });
+		const { error } = await this.supabase.from("summaries").upsert(
+			{ chat_id: chatId, summary_text: summaryText },
+			{ onConflict: "chat_id" }, // Use the unique constraint for proper upsert
+		);
 
 		if (error) throw error;
 	}

@@ -99,11 +99,8 @@ export const routerNode = async (state: ChatState) => {
 	const lastMessage = humanMessages[humanMessages.length - 1];
 
 	if (!lastMessage) {
-		console.log("No human message found, defaulting to chat_agent");
 		return { goto: "chat_agent" };
 	}
-
-	console.log("Router analyzing message:", lastMessage.content);
 
 	const responseSchema = z.object({
 		goto: z
@@ -117,6 +114,5 @@ export const routerNode = async (state: ChatState) => {
 		})
 		.invoke([systemPrompt, lastMessage]);
 
-	console.log("Router decided to go to:", goto);
 	return { goto };
 };

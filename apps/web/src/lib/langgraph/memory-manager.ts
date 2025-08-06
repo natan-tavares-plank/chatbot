@@ -9,6 +9,7 @@ import {
 	type Checkpoint,
 	type CheckpointTuple,
 } from "@langchain/langgraph";
+import { z } from "zod";
 import type { createClient } from "../supabase/server";
 import { ChatService } from "../supabase/service";
 import { llm } from "./agents";
@@ -22,10 +23,7 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 		private readonly threadId: string,
 	) {
 		super();
-		// Initialize chat service directly since we have the client
-		console.log("🔧 Initializing MemoryManager for thread:", threadId);
 		this.chatService = new ChatService(supabase);
-		console.log("✅ MemoryManager initialized");
 	}
 
 	private async initChatService() {
@@ -33,8 +31,6 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 	}
 
 	async getTuple(config: RunnableConfig): Promise<CheckpointTuple | undefined> {
-		// This is a simplified implementation
-		// In a real scenario, you'd store and retrieve checkpoints from the database
 		try {
 			const threadId = config.configurable?.thread_id as string;
 			if (!threadId) return undefined;
@@ -56,17 +52,11 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 		try {
 			const threadId = config.configurable?.thread_id as string;
 			if (threadId) {
-				console.log("💾 LangGraph put called for thread:", threadId);
-				console.log("📦 Checkpoint data:", checkpoint);
-
 				const chatService = await this.initChatService();
 
 				// Extract state from checkpoint
 				if (checkpoint.channel_values) {
 					const state = checkpoint.channel_values;
-					console.log("🔍 State in checkpoint:", state);
-
-					// Save the state using our persistState method
 					await this.persistState(state as typeof StateAnnotation.State);
 				}
 
@@ -74,12 +64,7 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 				await chatService.saveCheckpoint(threadId, { checkpoint, metadata });
 			}
 		} catch (error) {
-			console.error("❌ Error in put method:", error);
-			console.error("🔍 Error details:", {
-				threadId: config.configurable?.thread_id,
-				checkpointKeys: checkpoint ? Object.keys(checkpoint) : "no checkpoint",
-				errorMessage: error instanceof Error ? error.message : String(error),
-			});
+			console.error("Error in put method:", error);
 		}
 		return config;
 	}
@@ -90,7 +75,6 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 		taskId: string,
 	): Promise<void> {
 		// Implementation for putting writes - can be empty for now
-		console.log("putWrites called", { config, writes, taskId });
 	}
 
 	async *list(
@@ -119,36 +103,16 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 		try {
 			const { messages, summary } = state;
 			const chatService = await this.initChatService();
-
-			console.log("🔄 Persisting state for thread:", this.threadId);
-			console.log("📝 Messages to save:", messages?.length || 0);
-
-			// Ensure chat session exists
 			await chatService.saveChatSession(this.threadId);
-			console.log("✅ Chat session saved/updated");
 
-			// Save messages to database
 			if (messages && messages.length > 0) {
-				console.log("💾 Saving messages...");
 				await chatService.saveMessages(this.threadId, messages);
-				console.log("✅ Messages saved successfully");
 			}
 
-			// Save summary if exists
 			if (summary) {
-				console.log("📄 Saving summary...");
 				await chatService.saveSummary(this.threadId, summary);
-				console.log("✅ Summary saved");
 			}
 		} catch (error) {
-			console.error("❌ Error persisting state:", error);
-			console.error("🔍 Error details:", {
-				threadId: this.threadId,
-				messageCount: state.messages?.length || 0,
-				errorMessage: error instanceof Error ? error.message : String(error),
-				errorStack: error instanceof Error ? error.stack : undefined,
-			});
-			// Re-throw the error so we can see it in the API response
 			throw error;
 		}
 	}
@@ -156,13 +120,16 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 	async loadState(): Promise<Partial<typeof StateAnnotation.State>> {
 		try {
 			const chatService = await this.initChatService();
-			const [messages, summary] = await Promise.all([
+
+			const [allMessages, summary] = await Promise.all([
 				chatService.getMessages(this.threadId),
 				chatService.getSummary(this.threadId),
 			]);
 
+			const messagesToLoad = summary ? allMessages.slice(-5) : allMessages;
+
 			return {
-				messages: messages.map((msg) => {
+				messages: messagesToLoad.map((msg) => {
 					if (msg.role === "user") {
 						return new HumanMessage(msg.content);
 					} else {
@@ -195,6 +162,11 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 // Export the summarizeMessages function for use in the graph
 export async function summarizeMessages(state: typeof StateAnnotation.State) {
 	const { summary, messages } = state;
+
+	if (messages.length < 8) {
+		return state;
+	}
+
 	let summaryMessage = "";
 	if (summary) {
 		summaryMessage =
@@ -207,21 +179,38 @@ export async function summarizeMessages(state: typeof StateAnnotation.State) {
 	const allMessages = [
 		...messages,
 		new HumanMessage({
-			id: "<user-id>",
+			id: state?.messages[0]?.id || "unknown",
 			content: summaryMessage,
 		}),
 	];
 
-	const response = await llm.invoke(allMessages);
-	const deleteMessages = messages.slice(0, -5).map((message) => {
-		return new RemoveMessage({
-			id: message.id || "unknown",
-		});
+	const responseSchema = z.object({
+		summary: z.string().describe("The summary of the conversation"),
 	});
 
-	if (typeof response.content !== "string") {
+	const response = await llm
+		.withStructuredOutput(responseSchema, {
+			name: "summarize_conversation",
+		})
+		.invoke(allMessages);
+
+	if (typeof response.summary !== "string") {
 		throw new Error("Expected a string response from the model");
 	}
 
-	return { summary: response.content, messages: deleteMessages };
+	const recentMessages = messages.slice(-5);
+	const messagesToRemoveFromState = messages.slice(0, -5);
+
+	const removeFromState = messagesToRemoveFromState.map(
+		(msg) => new RemoveMessage({ id: msg.id || "unknown" }),
+	);
+
+	return {
+		summary: response.summary,
+		messages: [...removeFromState, ...recentMessages],
+		goto: state.goto,
+		weather_data: state.weather_data,
+		news_data: state.news_data,
+		current_agent: state.current_agent,
+	};
 }

@@ -56,11 +56,20 @@ const graph = new StateGraph(StateAnnotation)
 	.addEdge("weather_agent", "chat_agent")
 	.addEdge("news_agent", "chat_agent")
 
-	.addEdge("chat_agent", "summarize_conversation")
+	.addConditionalEdges(
+		"chat_agent",
+		(state) => {
+			return state.messages?.length >= 8 ? "summarize_conversation" : "__end__";
+		},
+		{
+			summarize_conversation: "summarize_conversation",
+			__end__: "__end__",
+		},
+	)
 	.addEdge("summarize_conversation", "__end__");
 
 // Create a function to get the agent with a custom memory manager
-export function createAgent(memoryManager?: any) {
+export function createAgent(memoryManager?: MemorySaver) {
 	return graph.compile({
 		checkpointer: memoryManager || new MemorySaver(),
 	});

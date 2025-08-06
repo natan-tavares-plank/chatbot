@@ -34,7 +34,7 @@ const ChatBot = () => {
 		input,
 		handleInputChange,
 		handleSubmit,
-		status,
+		isLoading,
 		error,
 		reload,
 	} = useChat({
@@ -53,7 +53,7 @@ const ChatBot = () => {
 
 	const handleSendMessage = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!input.trim() || status === "streaming") return;
+		if (!input.trim() || isLoading) return;
 
 		handleSubmit(e);
 	};
@@ -170,7 +170,7 @@ const ChatBot = () => {
 									</div>
 								))}
 
-								{status === "streaming" && (
+								{isLoading && (
 									<div className="flex items-start space-x-3">
 										<div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
 											<Bot className="h-4 w-4" />
@@ -196,12 +196,9 @@ const ChatBot = () => {
 								onChange={handleInputChange}
 								placeholder="Ask about weather, news, or just chat with Captain Byte..."
 								className="flex-1"
-								disabled={status === "streaming"}
+								disabled={isLoading}
 							/>
-							<Button
-								type="submit"
-								disabled={status === "streaming" || !input.trim()}
-							>
+							<Button type="submit" disabled={isLoading || !input.trim()}>
 								<Send className="h-4 w-4" />
 							</Button>
 						</form>

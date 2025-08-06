@@ -32,10 +32,6 @@ export async function POST(req: NextRequest) {
 						}),
 		);
 
-		// Option 1: Use the current agent with MemorySaver (current implementation)
-		// const currentAgent = agent;
-
-		// Option 2: Use agent with database persistence (uncomment to enable)
 		const { agent: currentAgent, memoryManager } = await createAgentWithMemory(
 			user.id,
 		);
@@ -51,7 +47,10 @@ export async function POST(req: NextRequest) {
 			async start(controller) {
 				try {
 					const agentStream = await currentAgent.stream(
-						{ messages: langChainMessages },
+						{
+							messages: langChainMessages,
+							summary: previousState.summary || "",
+						},
 						{
 							configurable: {
 								thread_id: user.id,
@@ -70,14 +69,6 @@ export async function POST(req: NextRequest) {
 								await new Promise((resolve) => setTimeout(resolve, 5));
 							}
 						}
-					}
-
-					// Option: Persist final state to database (uncomment when using MemoryManager)
-					const finalState = await currentAgent.getState({
-						configurable: { thread_id: user.id },
-					});
-					if (memoryManager && finalState?.values) {
-						await memoryManager.persistState(finalState.values);
 					}
 
 					controller.close();
