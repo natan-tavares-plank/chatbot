@@ -45,7 +45,7 @@ export async function signUp(formData: FormData) {
 	redirect("/private");
 }
 
-export async function signOut() {
+export async function signOutAction() {
 	const supabase = await createClient();
 
 	const { error } = await supabase.auth.signOut();

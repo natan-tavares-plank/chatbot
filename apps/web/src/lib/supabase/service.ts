@@ -96,4 +96,17 @@ export class ChatService {
 
 		if (error) throw error;
 	}
+
+	async clearChat(chatId: string) {
+		const { error } = await this.supabase
+			.from("chats")
+			.delete()
+			.eq("user_id", chatId);
+
+		if (error) {
+			return { success: false, error: error.message };
+		}
+
+		return { success: true };
+	}
 }

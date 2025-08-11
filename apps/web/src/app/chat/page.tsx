@@ -1,7 +1,7 @@
 "use client";
 
-import { useChat } from "@ai-sdk/react";
-import { Bot, Cloud, LogOut, Newspaper, Send, User } from "lucide-react";
+import { type Message, useChat } from "@ai-sdk/react";
+import { Bot, Cloud, Newspaper, Send, User } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef } from "react";
 import {
@@ -12,7 +12,7 @@ import {
 	ScrollArea,
 	Separator,
 } from "@/components/ui";
-import { signOut } from "../auth/action";
+import { Header } from "./_components/header";
 
 const agentColors = {
 	chat: "bg-primary text-primary-foreground",
@@ -26,7 +26,11 @@ const agentIcons = {
 	news: <Newspaper className="h-3 w-3" />,
 };
 
-const ChatBot = () => {
+type ChatBootProps = {
+	initialMessages: Message[];
+};
+
+const ChatBot = ({ initialMessages }: ChatBootProps) => {
 	const scrollAreaRef = useRef<HTMLDivElement>(null);
 
 	const {
@@ -40,6 +44,7 @@ const ChatBot = () => {
 	} = useChat({
 		streamProtocol: "text",
 		api: "/api/chat",
+		initialMessages,
 		onError: (error) => {
 			console.error("Chat error:", error);
 		},
@@ -67,22 +72,7 @@ const ChatBot = () => {
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
-			{/* Header */}
-			<header className="border-b border-border/50 bg-background/80 backdrop-blur-sm">
-				<div className="container mx-auto px-4 py-4 flex items-center justify-between">
-					<div className="flex items-center space-x-2">
-						<Bot className="h-6 w-6 text-primary" />
-						<h1 className="text-xl font-bold">Captain Byte</h1>
-						<Badge variant="secondary" className="text-xs">
-							Multi-Agent AI
-						</Badge>
-					</div>
-					<Button type="button" variant="ghost" size="sm" onClick={signOut}>
-						<LogOut className="h-4 w-4 mr-2" />
-						Logout
-					</Button>
-				</div>
-			</header>
+			<Header />
 
 			{/* Main Chat Area */}
 			<div className="container mx-auto px-4 py-6 max-w-4xl">
