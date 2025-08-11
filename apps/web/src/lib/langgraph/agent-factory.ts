@@ -7,7 +7,7 @@ export async function createAgentWithMemory(userId: string) {
 	const memoryManager = new MemoryManager(supabase, userId);
 
 	return {
-		agent: createAgent(memoryManager),
+		agent: createAgent(memoryManager as any), // TODO: Replace 'as any' with proper interface implementation
 		memoryManager,
 	};
 }

@@ -21,8 +21,8 @@ export async function signIn(formData: FormData) {
 		return { error: error.message };
 	}
 
-	revalidatePath("/private", "layout");
-	redirect("/private");
+	revalidatePath("/chat", "layout");
+	redirect("/chat");
 }
 
 export async function signUp(formData: FormData) {
@@ -41,8 +41,8 @@ export async function signUp(formData: FormData) {
 		return { error: error.message };
 	}
 
-	revalidatePath("/private", "layout");
-	redirect("/private");
+	revalidatePath("/chat", "layout");
+	redirect("/chat");
 }
 
 export async function signOutAction() {
