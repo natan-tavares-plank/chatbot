@@ -24,9 +24,16 @@ export const StateAnnotation = Annotation.Root({
 		value: (_existing, update) => update,
 		default: () => null,
 	}),
-	current_agent: Annotation<string>({
-		value: (_existing, update) => update,
-		default: () => "",
+	agent_calls: Annotation<Record<string, number>>({
+		reducer: (existing, update) => {
+			const result: Record<string, number> = { ...existing };
+			for (const [key, value] of Object.entries(update || {})) {
+				const incoming = Number(value ?? 0);
+				result[key] = (result[key] ?? 0) + incoming;
+			}
+			return result;
+		},
+		default: () => ({}),
 	}),
 	summary: Annotation<string>({
 		value: (_, update) => update,

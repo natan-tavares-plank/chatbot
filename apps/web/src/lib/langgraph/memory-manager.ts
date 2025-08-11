@@ -70,9 +70,9 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 	}
 
 	async putWrites(
-		config: RunnableConfig,
-		writes: Array<[string, unknown]>,
-		taskId: string,
+		_config: RunnableConfig,
+		_writes: Array<[string, unknown]>,
+		_taskId: string,
 	): Promise<void> {
 		// Implementation for putting writes - can be empty for now
 	}
@@ -101,12 +101,20 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 
 	async persistState(state: typeof StateAnnotation.State) {
 		try {
-			const { messages, summary } = state;
+			const { messages, summary, agent_calls } = state;
 			const chatService = await this.initChatService();
 			await chatService.saveChatSession(this.threadId);
 
 			if (messages && messages.length > 0) {
-				await chatService.saveMessages(this.threadId, messages);
+				// Determine agents for the last assistant message from agent_calls keys
+				const agentsForLastAssistant = agent_calls
+					? Object.keys(agent_calls)
+					: undefined;
+				await chatService.saveMessages(
+					this.threadId,
+					messages,
+					agentsForLastAssistant,
+				);
 			}
 
 			if (summary) {
@@ -206,11 +214,12 @@ export async function summarizeMessages(state: typeof StateAnnotation.State) {
 	);
 
 	return {
+		...state,
 		summary: response.summary,
 		messages: [...removeFromState, ...recentMessages],
-		goto: state.goto,
-		weather_data: state.weather_data,
-		news_data: state.news_data,
-		current_agent: state.current_agent,
+		// goto: state.goto,
+		// weather_data: state.weather_data,
+		// news_data: state.news_data,
+		// agent_calls: state.agent_calls,
 	};
 }

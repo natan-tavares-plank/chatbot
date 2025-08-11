@@ -3,7 +3,7 @@
 import { type Message, useChat } from "@ai-sdk/react";
 import { Bot, Cloud, Newspaper, Send, User } from "lucide-react";
 import type React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
 	Badge,
 	Button,
@@ -28,39 +28,91 @@ const agentIcons = {
 
 type ChatBootProps = {
 	initialMessages: Message[];
+	initialAgentsByMessageId?: Record<string, string[]>;
 };
 
-const ChatBot = ({ initialMessages }: ChatBootProps) => {
+const ChatBot = ({
+	initialMessages,
+	initialAgentsByMessageId,
+}: ChatBootProps) => {
 	const scrollAreaRef = useRef<HTMLDivElement>(null);
 
 	const {
 		messages,
 		input,
 		handleInputChange,
-		handleSubmit,
 		isLoading,
 		error,
 		reload,
+		setInput,
+		setMessages,
 	} = useChat({
-		streamProtocol: "text",
 		api: "/api/chat",
 		initialMessages,
 		onError: (error) => {
 			console.error("Chat error:", error);
 		},
-		onFinish: (message) => {
-			// Auto-scroll to bottom when new message arrives
-			if (scrollAreaRef.current) {
-				scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
-			}
-		},
 	});
+
+	const [agentsByMessageId, setAgentsByMessageId] = useState<
+		Record<string, string[]>
+	>(initialAgentsByMessageId || {});
+
+	const normalizeAgent = (name: string) => {
+		if (name.includes("weather")) return "weather" as const;
+		if (name.includes("news")) return "news" as const;
+		return "chat" as const;
+	};
+
+	// Using SSR-provided initial agents avoids client layout shift
 
 	const handleSendMessage = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!input.trim() || isLoading) return;
+		const userText = input;
 
-		handleSubmit(e);
+		// Optimistically add user message locally (do not trigger hook request)
+		const userId =
+			typeof crypto !== "undefined" && "randomUUID" in crypto
+				? (crypto as Crypto & { randomUUID: () => string }).randomUUID()
+				: `${Date.now()}-u`;
+		setMessages((prev) => [
+			...prev,
+			{ id: userId, role: "user", content: userText },
+		]);
+		setInput("");
+
+		try {
+			const bodyMessages = [...messages, { role: "user", content: userText }];
+			const res = await fetch("/api/chat", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ messages: bodyMessages }),
+			});
+			if (!res.ok) {
+				const text = await res.text();
+				throw new Error(text || `Request failed with ${res.status}`);
+			}
+			const data: { content: string; agents?: string[] | undefined } =
+				await res.json();
+
+			const assistantId =
+				typeof crypto !== "undefined" && "randomUUID" in crypto
+					? (crypto as Crypto & { randomUUID: () => string }).randomUUID()
+					: `${Date.now()}`;
+
+			setMessages((prev) => [
+				...prev,
+				{ id: assistantId, role: "assistant", content: data.content },
+			]);
+			if (Array.isArray(data.agents) && data.agents.length) {
+				const next: Record<string, string[]> = { ...agentsByMessageId };
+				next[assistantId] = data.agents;
+				setAgentsByMessageId(next);
+			}
+		} catch (err) {
+			console.error("Send message error:", err);
+		}
 	};
 
 	// Auto-scroll to bottom when messages change
@@ -153,6 +205,24 @@ const ChatBot = ({ initialMessages }: ChatBootProps) => {
 													{message.content}
 												</p>
 											</div>
+											{message.role === "assistant" &&
+												message.id &&
+												agentsByMessageId[message.id] && (
+													<div className="flex items-center gap-1 mt-1">
+														{agentsByMessageId[message.id]?.map((agent) => {
+															const key = normalizeAgent(agent);
+															return (
+																<Badge
+																	key={`${message.id}-${agent}`}
+																	className={`${agentColors[key]} text-xs capitalize`}
+																>
+																	{agentIcons[key]}
+																	<span className="ml-1">{key}</span>
+																</Badge>
+															);
+														})}
+													</div>
+												)}
 											<span className="text-xs text-muted-foreground">
 												{message.createdAt?.toLocaleTimeString()}
 											</span>

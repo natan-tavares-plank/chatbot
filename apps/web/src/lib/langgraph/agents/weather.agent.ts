@@ -1,7 +1,7 @@
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import { Command } from "@langchain/langgraph";
 import { weatherTool } from "../tools/weather.tool";
-import type { ChatState } from "../types";
+import { Agent, type ChatState } from "../types";
 import { llm } from ".";
 
 const systemPrompt = [
@@ -44,8 +44,10 @@ export const weatherAgent = async (state: ChatState): Promise<Command> => {
 		goto: "chat_agent",
 		update: {
 			messages: [aiMessage],
-			current_agent: "weather_agent",
 			weather_data: weatherData,
+			agent_calls: {
+				[Agent.WEATHER]: 1,
+			},
 		},
 	});
 };

@@ -3,7 +3,7 @@ import { Command } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
 import z from "zod";
 import { env } from "../../../env";
-import type { ChatState } from "../types";
+import { Agent, type ChatState } from "../types";
 
 const llm = new ChatOpenAI({
 	openAIApiKey: env.OPENAI_API_KEY,
@@ -102,7 +102,9 @@ export const chatAgent = async (state: ChatState): Promise<Command> => {
 		// goto: "summarize_conversation",
 		update: {
 			messages: [aiMessage],
-			current_agent: "chat_agent",
+			agent_calls: {
+				[Agent.CHAT]: 1,
+			},
 		},
 	});
 };

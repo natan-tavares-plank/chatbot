@@ -1,7 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import "@/lib/langgraph/langsmith";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
+import { UnauthorizedError } from "@/@errors";
 import { createAgentWithMemory } from "@/lib/langgraph/agent-factory";
+import type { StateAnnotation } from "@/lib/langgraph/graph";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "edge";
@@ -13,12 +15,22 @@ export async function POST(req: NextRequest) {
 			data: { user },
 		} = await auth.getUser();
 		if (!user?.id) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+			return NextResponse.json(
+				{
+					error: new UnauthorizedError(
+						"User id is required to perform this action",
+					),
+				},
+				{ status: 401 },
+			);
 		}
 
 		const { messages } = await req.json();
 		if (!messages?.length) {
-			return NextResponse.json({ error: "No messages" }, { status: 400 });
+			return NextResponse.json(
+				{ error: "No messages provided" },
+				{ status: 400 },
+			);
 		}
 
 		// Convert messages to LangChain format
@@ -42,49 +54,38 @@ export async function POST(req: NextRequest) {
 			langChainMessages.unshift(...previousState.messages);
 		}
 
-		// Create stream
-		const stream = new ReadableStream({
-			async start(controller) {
-				try {
-					const agentStream = await currentAgent.stream(
-						{
-							messages: langChainMessages,
-							summary: previousState.summary || "",
-						},
-						{
-							configurable: {
-								thread_id: user.id,
-								user_id: user.id,
-							},
-						},
-					);
-
-					const processed = new Set<string>();
-
-					for await (const chunk of agentStream) {
-						const content = extractNewContent(chunk, processed);
-						if (content) {
-							for (const char of content) {
-								controller.enqueue(new TextEncoder().encode(char));
-								await new Promise((resolve) => setTimeout(resolve, 5));
-							}
-						}
-					}
-
-					controller.close();
-				} catch (error) {
-					console.error("Stream error:", error);
-					controller.error(error);
-				}
+		// Non-streaming invocation: return JSON with content and involved agents
+		const finalState: typeof StateAnnotation.State = await currentAgent.invoke(
+			{
+				messages: langChainMessages,
+				summary: previousState.summary || "",
 			},
-		});
-
-		return new Response(stream, {
-			headers: {
-				"Content-Type": "text/event-stream",
-				"Cache-Control": "no-cache",
-				Connection: "keep-alive",
+			{
+				configurable: {
+					thread_id: user.id,
+					user_id: user.id,
+				},
 			},
+		);
+
+		// Extract the final assistant content
+		const allMessages = Array.isArray(finalState?.messages)
+			? (finalState.messages as (AIMessage | HumanMessage)[])
+			: [];
+		const lastAiMessage = [...allMessages]
+			.reverse()
+			.find((m) => m instanceof AIMessage) as AIMessage | undefined;
+		const content = String(lastAiMessage?.content ?? "");
+
+		const agents = finalState?.agent_calls
+			? Object.keys(finalState.agent_calls)
+			: [];
+
+		return NextResponse.json({
+			content,
+			agents,
+			weather_data: finalState?.weather_data ?? null,
+			news_data: finalState?.news_data ?? null,
 		});
 	} catch (error) {
 		console.error("API error:", error);
@@ -95,44 +96,4 @@ export async function POST(req: NextRequest) {
 	}
 }
 
-// Simple content extraction - just get the latest content from any format
-function extractNewContent(chunk: any, processed: Set<string>): string | null {
-	// Try to find content in various chunk formats
-	const content = findContentInChunk(chunk);
-	if (!content || processed.has(content)) return null;
-
-	processed.add(content);
-	return content;
-}
-
-function findContentInChunk(chunk: any): string | null {
-	// Handle different chunk formats
-	if (typeof chunk === "string") return chunk;
-	if (chunk?.content) return String(chunk.content);
-
-	// Look for messages array
-	if (Array.isArray(chunk)) {
-		const lastMsg = chunk[chunk.length - 1];
-		return lastMsg?.content ? String(lastMsg.content) : null;
-	}
-
-	// Look through object keys
-	for (const value of Object.values(chunk || {})) {
-		if (value && typeof value === "object" && "content" in value) {
-			return String((value as any).content);
-		}
-		if (Array.isArray(value)) {
-			const lastMsg = value[value.length - 1];
-			if (lastMsg?.content) return String(lastMsg.content);
-		}
-		if (value && typeof value === "object" && "messages" in value) {
-			const messages = (value as any).messages;
-			if (Array.isArray(messages)) {
-				const lastMsg = messages[messages.length - 1];
-				if (lastMsg?.content) return String(lastMsg.content);
-			}
-		}
-	}
-
-	return null;
-}
+// (streaming helpers removed; API now returns a single JSON response)

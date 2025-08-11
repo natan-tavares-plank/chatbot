@@ -1,7 +1,7 @@
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import { Command } from "@langchain/langgraph";
 import { newsTool } from "../tools/news.tool";
-import type { ChatState } from "../types";
+import { Agent, type ChatState } from "../types";
 import { llm } from ".";
 
 const systemPrompt = [
@@ -44,8 +44,10 @@ export const newsAgent = async (state: ChatState): Promise<Command> => {
 		goto: "chat_agent",
 		update: {
 			messages: [aiMessage],
-			current_agent: "news_agent",
 			news_data: newsData,
+			agent_calls: {
+				[Agent.NEWS]: 1,
+			},
 		},
 	});
 };

@@ -17,12 +17,26 @@ export default async function ChatLayout() {
 	const chatService = new ChatService(supabase);
 	const response = await chatService.getMessages(data.user.id);
 
+	console.log("response", response);
+
 	const messages = response?.map((m) => ({
 		id: m.id,
 		role: m.role,
-		content: m.content,
-		agent: m.agent ?? "chat",
+		content: typeof m.content === "string" ? m.content : String(m.content),
 	}));
 
-	return <ChatBot initialMessages={messages || []} />;
+	const initialAgentsByMessageId: Record<string, string[]> = {};
+	for (const m of response || []) {
+		const agents = (m as { agents?: string[] }).agents;
+		if (m.role === "assistant" && Array.isArray(agents) && agents.length) {
+			initialAgentsByMessageId[m.id] = agents;
+		}
+	}
+
+	return (
+		<ChatBot
+			initialMessages={messages || []}
+			initialAgentsByMessageId={initialAgentsByMessageId}
+		/>
+	);
 }

@@ -19,23 +19,58 @@ export class ChatService {
 		return data;
 	}
 
-	async saveMessages(chatId: string, messages: Message[]) {
+	async saveMessages(
+		chatId: string,
+		messages: Message[],
+		agentsForLastAssistant?: string[],
+	) {
 		const existingMessages = await this.getMessages(chatId);
 		const existingContents = new Set(
 			existingMessages.map((msg) => msg.content),
 		);
 
+		// Determine last assistant message content from the provided messages
+		const lastAssistant = [...messages]
+			.reverse()
+			.find((m) => m._getType() !== "human");
+		const lastAssistantContentStr = lastAssistant
+			? typeof lastAssistant.content === "string"
+				? lastAssistant.content
+				: JSON.stringify(lastAssistant.content)
+			: undefined;
+
 		const messagesToInsert = messages
 			.filter((msg) => msg.content.toString().trim())
-			.map((msg) => ({
-				chat_id: chatId,
-				role: msg._getType() === "human" ? "user" : "assistant",
-				content:
+			.map((msg) => {
+				const role = msg._getType() === "human" ? "user" : "assistant";
+				const contentStr =
 					typeof msg.content === "string"
 						? msg.content
-						: JSON.stringify(msg.content),
-			}))
-			.filter((msg) => !existingContents.has(msg.content));
+						: JSON.stringify(msg.content);
+
+				const base = {
+					chat_id: chatId,
+					role,
+					content: contentStr,
+				} as {
+					chat_id: string;
+					role: string;
+					content: string;
+					agents?: string[];
+				};
+
+				if (
+					role === "assistant" &&
+					agentsForLastAssistant &&
+					lastAssistantContentStr &&
+					contentStr === lastAssistantContentStr
+				) {
+					base.agents = agentsForLastAssistant;
+				}
+
+				return base;
+			})
+			.filter((row) => !existingContents.has(row.content));
 
 		if (messagesToInsert.length === 0) {
 			return;

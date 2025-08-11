@@ -1,13 +1,8 @@
-import {
-	AIMessage,
-	HumanMessage,
-	SystemMessage,
-} from "@langchain/core/messages";
-import { Command } from "@langchain/langgraph";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
 import z from "zod";
 import { env } from "../../../env";
-import type { ChatState } from "../types";
+import { Agent, type ChatState } from "../types";
 
 /**
  * This is the base LLM that all agents use.
@@ -17,65 +12,6 @@ export const llm = new ChatOpenAI({
 	model: "gpt-4o-mini",
 	temperature: 0,
 });
-
-/**
- * This is the base agent node that all other agents inherit from.
- * @param params.name - The name of the agent.
- * @param params.destinations - The possible destinations for the agent.
- * @param params.systemPrompt - The system prompt for the agent.
- * @param params.tools - Optional tools that this agent can use.
- * @returns - The agent node.
- * @deprecated - It's not used anymore.
- */
-export const makeAgentNode = (params: {
-	name: string;
-	destinations: string[];
-	systemPrompt: string;
-}) => {
-	return async (state: ChatState) => {
-		const possibleDestinations = ["__end__", ...params.destinations] as const;
-
-		const responseSchema = z.object({
-			response: z
-				.string()
-				.describe(
-					"A human readable response to the original question. Does not need to be a final response. Will be streamed back to the user.",
-				),
-			goto: z
-				.enum(possibleDestinations)
-				.describe(
-					"The next agent to call, or __end__ if the user's query has been resolved. Must be one of the specified values.",
-				),
-		});
-
-		const messages = [
-			{
-				role: "system" as const,
-				content: params.systemPrompt,
-			},
-			...state.messages,
-		];
-
-		const response = await llm
-			.withStructuredOutput(responseSchema, {
-				name: params.name,
-			})
-			.invoke(messages);
-
-		const aiMessage = new AIMessage({
-			content: response.response,
-			name: params.name,
-		});
-
-		return new Command({
-			goto: response.goto,
-			update: {
-				messages: [aiMessage],
-				current_agent: params.name,
-			},
-		});
-	};
-};
 
 /**
  * This is the router node that decides which agent to call next.
@@ -99,7 +35,7 @@ export const routerNode = async (state: ChatState) => {
 	const lastMessage = humanMessages[humanMessages.length - 1];
 
 	if (!lastMessage) {
-		return { goto: "chat_agent" };
+		return { goto: Agent.CHAT, agent_calls: { [Agent.CHAT]: 1 } };
 	}
 
 	const responseSchema = z.object({
@@ -114,5 +50,5 @@ export const routerNode = async (state: ChatState) => {
 		})
 		.invoke([systemPrompt, lastMessage]);
 
-	return { goto };
+	return { goto, agent_calls: { [goto]: 1 } };
 };
