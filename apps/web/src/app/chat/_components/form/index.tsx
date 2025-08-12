@@ -24,7 +24,7 @@ export const Form = (props: FormProps) => {
 		<motion.form
 			onSubmit={onSubmit}
 			// bg-zinc-700
-			className={`mx-auto min-w-[480px] relative border rounded-xl border-zinc-600 backdrop-blur-sm flex space-x-2 items-center px-4 py-2 ${
+			className={`mx-auto min-w-[480px] relative border rounded-xl border-zinc-600 backdrop-blur-sm flex flex-col space-y-2 px-4 py-2 ${
 				variant === "center"
 					? "bg-zinc-700"
 					: "max-w-4xl w-[calc(100%-32px)] sticky bottom-4 bg-transparent"
@@ -34,7 +34,7 @@ export const Form = (props: FormProps) => {
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ type: "spring", stiffness: 140, damping: 18 }}
 		>
-			<div className="flex flex-1 items-center">
+			<div className="flex flex-1 items-center w-full">
 				<Search className="h-4 w-4 text-zinc-400 mr-2" />
 
 				<Input
@@ -44,6 +44,32 @@ export const Form = (props: FormProps) => {
 					disabled={isLoading}
 					onChange={handleInputChange}
 				/>
+			</div>
+
+			<div className="flex items-center space-x-2">
+				<button
+					type="button"
+					className="bg-zinc-600 hover:bg-zinc-800 text-zinc-300 text-xs px-2 py-1 rounded-md transition-colors"
+					onClick={() => {
+						handleInputChange({
+							target: { value: "Weather at London" },
+						} as React.ChangeEvent<HTMLInputElement>);
+					}}
+				>
+					Weather at London
+				</button>
+
+				<button
+					type="button"
+					className="bg-zinc-600 hover:bg-zinc-800 text-zinc-300 text-xs px-2 py-1 rounded-md transition-colors"
+					onClick={() => {
+						handleInputChange({
+							target: { value: "News about AI" },
+						} as React.ChangeEvent<HTMLInputElement>);
+					}}
+				>
+					News about AI
+				</button>
 			</div>
 
 			<Button
