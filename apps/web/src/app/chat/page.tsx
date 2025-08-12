@@ -22,9 +22,9 @@ const ChatBot = (props: ChatBootProps) => {
 		messages,
 		input,
 		handleInputChange,
-		isLoading,
 		error,
 		reload,
+		status,
 		setInput,
 		setMessages,
 	} = useChat({
@@ -39,7 +39,8 @@ const ChatBot = (props: ChatBootProps) => {
 
 	const handleSendMessage = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!input.trim() || isLoading) return;
+		if (!input.trim() || status === "streaming" || status === "submitted")
+			return;
 		const userText = input;
 
 		// Optimistically add user message locally (do not trigger hook request)
@@ -92,7 +93,7 @@ const ChatBot = (props: ChatBootProps) => {
 			<MessagesList
 				messages={messages}
 				agentsByMessageId={agentsByMessageId}
-				isLoading={isLoading}
+				isLoading={status === "streaming" || status === "submitted"}
 			/>
 			{/* {!error && (
 					<div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
@@ -106,7 +107,7 @@ const ChatBot = (props: ChatBootProps) => {
 				input={input}
 				onSubmit={handleSendMessage}
 				handleInputChange={handleInputChange}
-				isLoading={isLoading}
+				isLoading={status === "streaming" || status === "submitted"}
 				variant={messages.length ? "bottom" : "center"}
 			/>
 		</div>

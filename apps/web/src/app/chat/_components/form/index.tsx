@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { ArrowUp, Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +21,7 @@ export const Form = (props: FormProps) => {
 	} = props;
 
 	return (
-		<form
+		<motion.form
 			onSubmit={onSubmit}
 			// bg-zinc-700
 			className={`mx-auto min-w-[480px] relative border rounded-xl border-zinc-600 backdrop-blur-sm flex space-x-2 items-center px-4 py-2 ${
@@ -28,6 +29,10 @@ export const Form = (props: FormProps) => {
 					? "bg-zinc-700"
 					: "max-w-4xl w-[calc(100%-32px)] sticky bottom-4 bg-transparent"
 			}`}
+			layout
+			initial={{ opacity: 0, y: variant === "center" ? -12 : 24 }}
+			animate={{ opacity: 1, y: 0 }}
+			transition={{ type: "spring", stiffness: 140, damping: 18 }}
 		>
 			<div className="flex flex-1 items-center">
 				<Search className="h-4 w-4 text-zinc-400 mr-2" />
@@ -54,6 +59,6 @@ export const Form = (props: FormProps) => {
 					<ArrowUp className="h-4 w-4" />
 				)}
 			</Button>
-		</form>
+		</motion.form>
 	);
 };
