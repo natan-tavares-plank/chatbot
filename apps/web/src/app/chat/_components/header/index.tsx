@@ -1,7 +1,7 @@
-import { Bot, LogOut, Trash } from "lucide-react";
-import { clearChatAction } from "@/app/api/chat/actions";
+import { Bot, LogOut } from "lucide-react";
 import { signOutAction } from "@/app/auth/action";
 import { Button } from "@/components/ui/button";
+import { EraseBtn } from "./erase-btn";
 
 type HeaderProps = {
 	chatTitle: string;
@@ -17,15 +17,7 @@ export const Header = ({ chatTitle = "New Chat" }: HeaderProps) => {
 				</div>
 
 				<div className="space-x-4">
-					<Button
-						type="button"
-						className="bg-zinc-900 hover:bg-red-900"
-						size="sm"
-						onClick={clearChatAction}
-					>
-						<Trash className="mr-1" />
-						Clear Chat
-					</Button>
+					<EraseBtn />
 
 					<Button
 						type="button"

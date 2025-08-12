@@ -1,5 +1,4 @@
 "use server";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ChatService } from "@/lib/supabase/service";
 
@@ -15,8 +14,9 @@ export async function clearChatAction() {
 	const response = await chatService.clearChat(data.user.id);
 
 	if (response.error) {
+		console.error("error at action", response.error);
 		return { error: response.error };
 	}
 
-	redirect("/");
+	return { error: null };
 }
