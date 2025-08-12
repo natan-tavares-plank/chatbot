@@ -1,4 +1,3 @@
-import type { User } from "@supabase/supabase-js";
 import {
 	ArrowRight,
 	Bot,
