@@ -23,7 +23,6 @@ export const Form = (props: FormProps) => {
 	return (
 		<motion.form
 			onSubmit={onSubmit}
-			// bg-zinc-700
 			className={`mx-auto min-w-[480px] relative border rounded-xl border-zinc-600 backdrop-blur-sm flex flex-col space-y-2 px-4 py-2 ${
 				variant === "center"
 					? "bg-zinc-700"

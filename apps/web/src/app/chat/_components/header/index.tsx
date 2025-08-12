@@ -21,7 +21,7 @@ export const Header = ({ chatTitle = "New Chat" }: HeaderProps) => {
 
 					<Button
 						type="button"
-						className="bg-zinc-950 hover:bg-indigo-900"
+						className="bg-zinc-950 hover:bg-zinc-700"
 						size="sm"
 						onClick={signOutAction}
 					>

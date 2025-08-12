@@ -31,7 +31,7 @@ export const EraseBtn = () => {
 	return (
 		<Button
 			type="button"
-			className="bg-zinc-900 hover:bg-red-900"
+			className="bg-zinc-900 hover:bg-rose-800"
 			size="sm"
 			onClick={handleClick}
 			disabled={isLoading}
