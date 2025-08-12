@@ -95,5 +95,3 @@ export async function POST(req: NextRequest) {
 		);
 	}
 }
-
-// (streaming helpers removed; API now returns a single JSON response)

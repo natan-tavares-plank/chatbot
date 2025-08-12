@@ -1,7 +1,7 @@
 "use client";
 
 import type { Message } from "@ai-sdk/react";
-import { Bot, Cloud, Newspaper } from "lucide-react";
+import { Bot, Cloud, Globe, Newspaper } from "lucide-react";
 import { useEffect } from "react";
 import {
 	AnimatePresence,
@@ -10,6 +10,7 @@ import {
 	MessageAvatarMotion,
 	MessageBubbleMotion,
 	MessageRowMotion,
+	motion,
 	ShimmerOnce,
 	StaggerText,
 	scrollToBottomSmooth,
@@ -18,15 +19,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 const agentColors = {
-	chat: "bg-primary text-primary-foreground",
+	chat: "bg-zinc-700 text-primary-foreground",
 	weather: "bg-blue-500 text-white",
-	news: "bg-rose-500 text-white",
+	news: "bg-green-500 text-white",
 };
 
 const agentIcons = {
-	chat: <Bot className="h-3 w-3" />,
-	weather: <Cloud className="h-3 w-3" />,
-	news: <Newspaper className="h-3 w-3" />,
+	chat: <Bot className="h-3.5 w-3.5 text-zinc-400" />,
+	weather: <Cloud className="h-3.5 w-3.5" />,
+	news: <Newspaper className="h-3.5 w-3.5" />,
 };
 
 const normalizeAgent = (name: string) => {
@@ -71,12 +72,15 @@ export const MessagesList = (props: MessagesProps) => {
 					>
 						{message.role !== "user" ? (
 							<MessageAvatarMotion
-								className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-zinc-800 text-zinc-400`}
+								className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+									agentColors[
+										normalizeAgent(agentsByMessageId[message.id]?.[0] || "chat")
+									] || "bg-zinc-800 text-zinc-400"
+								}`}
 							>
-								{agentsByMessageId[message.id]?.map((agent) => {
-									const key = normalizeAgent(agent);
-									return agentIcons[key];
-								})[0] || <Bot className="h-4 w-4" />}
+								{agentIcons[
+									normalizeAgent(agentsByMessageId[message.id]?.[0] || "chat")
+								] || <Bot className="h-4 w-4" />}
 							</MessageAvatarMotion>
 						) : null}
 
@@ -134,16 +138,45 @@ export const MessagesList = (props: MessagesProps) => {
 
 			<AnimatePresence>
 				{isLoading && (
-					<TypingIndicatorMotion className="flex items-start space-x-3">
-						<div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-							<Bot className="h-4 w-4" />
+					<TypingIndicatorMotion className="flex items-start gap-3">
+						<div className="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 flex items-center justify-center shadow-sm">
+							<Globe className="h-4 w-4 animate-pulse" />
 						</div>
-						<div className="bg-muted px-4 py-2 rounded-lg">
-							<div className="flex space-x-1">
-								<div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
-								<div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce delay-100" />
-								<div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce delay-200" />
+						<div className="relative rounded-lg border border-zinc-700/60 bg-zinc-800/40 px-4 py-2 shadow-md backdrop-blur-sm">
+							<div className="flex items-center gap-1.5">
+								<motion.span
+									className="h-2 w-2 rounded-full bg-zinc-300"
+									animate={{ y: [0, -3, 0], opacity: [0.5, 1, 0.5] }}
+									transition={{
+										duration: 0.8,
+										repeat: Infinity,
+										ease: "easeInOut",
+									}}
+								/>
+								<motion.span
+									className="h-2 w-2 rounded-full bg-zinc-300"
+									animate={{ y: [0, -3, 0], opacity: [0.5, 1, 0.5] }}
+									transition={{
+										duration: 0.8,
+										repeat: Infinity,
+										ease: "easeInOut",
+										delay: 0.15,
+									}}
+								/>
+								<motion.span
+									className="h-2 w-2 rounded-full bg-zinc-300"
+									animate={{ y: [0, -3, 0], opacity: [0.5, 1, 0.5] }}
+									transition={{
+										duration: 0.8,
+										repeat: Infinity,
+										ease: "easeInOut",
+										delay: 0.3,
+									}}
+								/>
 							</div>
+							<span className="sr-only" aria-live="polite">
+								Assistant is typing…
+							</span>
 						</div>
 					</TypingIndicatorMotion>
 				)}

@@ -5,7 +5,6 @@ import type React from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { MessagesList } from "@/app/chat/_components/messages";
-import { Button } from "@/components/ui";
 import { Form } from "./_components/form";
 import { Header } from "./_components/header";
 
@@ -18,29 +17,23 @@ type ChatBootProps = {
 const ChatBot = (props: ChatBootProps) => {
 	const { chatTitle, initialMessages, initialAgentsByMessageId } = props;
 
-	const {
-		messages,
-		input,
-		handleInputChange,
-		error,
-		reload,
-		status,
-		setInput,
-		setMessages,
-	} = useChat({
-		api: "/api/chat",
-		initialMessages,
-		onError: (error) => toast.error(`Error: ${error.message}`),
-	});
+	const { messages, input, handleInputChange, setInput, setMessages } = useChat(
+		{
+			api: "/api/chat",
+			initialMessages,
+			onError: (error) => toast.error(`Error: ${error.message}`),
+		},
+	);
 
 	const [agentsByMessageId, setAgentsByMessageId] = useState<
 		Record<string, string[]>
 	>(initialAgentsByMessageId || {});
 
+	const [isRequesting, setIsRequesting] = useState(false);
+
 	const handleSendMessage = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!input.trim() || status === "streaming" || status === "submitted")
-			return;
+		if (!input.trim() || isRequesting) return;
 		const userText = input;
 
 		// Optimistically add user message locally (do not trigger hook request)
@@ -55,6 +48,7 @@ const ChatBot = (props: ChatBootProps) => {
 		setInput("");
 
 		try {
+			setIsRequesting(true);
 			const bodyMessages = [...messages, { role: "user", content: userText }];
 			const res = await fetch("/api/chat", {
 				method: "POST",
@@ -84,6 +78,8 @@ const ChatBot = (props: ChatBootProps) => {
 			}
 		} catch (err) {
 			console.error("Send message error:", err);
+		} finally {
+			setIsRequesting(false);
 		}
 	};
 
@@ -93,7 +89,7 @@ const ChatBot = (props: ChatBootProps) => {
 			<MessagesList
 				messages={messages}
 				agentsByMessageId={agentsByMessageId}
-				isLoading={status === "streaming" || status === "submitted"}
+				isLoading={isRequesting}
 			/>
 			{/* {!error && (
 					<div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
@@ -107,7 +103,7 @@ const ChatBot = (props: ChatBootProps) => {
 				input={input}
 				onSubmit={handleSendMessage}
 				handleInputChange={handleInputChange}
-				isLoading={status === "streaming" || status === "submitted"}
+				isLoading={isRequesting}
 				variant={messages.length ? "bottom" : "center"}
 			/>
 		</div>
