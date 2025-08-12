@@ -26,7 +26,7 @@ export const Form = (props: FormProps) => {
 			className={`mx-auto min-w-[480px] relative border rounded-xl border-zinc-600 backdrop-blur-sm flex space-x-2 items-center px-4 py-2 ${
 				variant === "center"
 					? "bg-zinc-700"
-					: "w-[calc(100%-32px)] sticky bottom-4 bg-transparent"
+					: "max-w-4xl w-[calc(100%-32px)] sticky bottom-4 bg-transparent"
 			}`}
 		>
 			<div className="flex flex-1 items-center">

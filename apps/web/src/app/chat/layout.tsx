@@ -38,8 +38,8 @@ export default async function ChatLayout() {
 		<div className="bg-gradient-to-br from-zinc-800 via-zinc-900 to-indigo-950 min-h-svh w-full flex flex-col">
 			<ChatBot
 				chatTitle={chat?.title || "Chatbot"}
-				// initialMessages={messages || []}
-				initialMessages={[...messages, ...messages, ...messages]}
+				initialMessages={messages || []}
+				// initialMessages={[...messages, ...messages, ...messages]}
 				initialAgentsByMessageId={initialAgentsByMessageId}
 			/>
 		</div>
