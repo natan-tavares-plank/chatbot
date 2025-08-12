@@ -8,6 +8,22 @@ interface Message {
 export class ChatService {
 	constructor(private supabase: SupabaseClient) {}
 
+	async getChatByUserId(userId: string) {
+		const { data, error } = await this.supabase
+			.from("chats")
+			.select("*")
+			.eq("user_id", userId)
+			.single();
+
+		if (error) {
+			if (error.code === "PGRST116") {
+				return null;
+			}
+			throw error;
+		}
+		return data;
+	}
+
 	async saveChatSession(userId: string, title: string = "New Chat") {
 		const { data, error } = await this.supabase
 			.from("chats")

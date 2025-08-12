@@ -1,38 +1,39 @@
 import { Bot, LogOut, Trash } from "lucide-react";
 import { clearChatAction } from "@/app/api/chat/actions";
 import { signOutAction } from "@/app/auth/action";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-export const Header = () => {
+type HeaderProps = {
+	chatTitle: string;
+};
+
+export const Header = ({ chatTitle = "New Chat" }: HeaderProps) => {
 	return (
-		<header className="border-b border-border/50 bg-background/80 backdrop-blur-sm">
-			<div className="container mx-auto px-4 py-4 flex items-center justify-between">
-				<div className="flex items-center space-x-2">
-					<Bot className="h-6 w-6 text-primary" />
-					<h1 className="text-xl font-bold">Captain Byte</h1>
-					<Badge variant="secondary" className="text-xs">
-						Multi-Agent AI
-					</Badge>
+		<header className="w-full border-b border-zinc-600 bg-transparent backdrop-blur-sm sticky top-0">
+			<div className="container mx-auto px-4 py-2 flex items-center justify-between">
+				<div className="flex items-center space-x-4">
+					<Bot className="h-6 w-6 text-zinc-500" />
+					<h1 className="text-lg font-bold text-zinc-50">{chatTitle}</h1>
 				</div>
-				<div className="">
+
+				<div className="space-x-4">
 					<Button
 						type="button"
-						variant="destructive"
+						className="bg-zinc-900 hover:bg-red-900"
 						size="sm"
 						onClick={clearChatAction}
 					>
-						<Trash className="h-4 w-4 mr-2" />
+						<Trash className="mr-1" />
 						Clear Chat
 					</Button>
 
 					<Button
 						type="button"
-						variant="ghost"
+						className="bg-zinc-950 hover:bg-indigo-900"
 						size="sm"
 						onClick={signOutAction}
 					>
-						<LogOut className="h-4 w-4 mr-2" />
+						<LogOut className="mr-1" />
 						Logout
 					</Button>
 				</div>

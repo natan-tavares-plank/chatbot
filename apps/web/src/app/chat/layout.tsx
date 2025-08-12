@@ -10,14 +10,15 @@ export default async function ChatLayout() {
 	const { data, error } = await supabase.auth.getUser();
 
 	if (error || !data?.user) {
-		// TODO: trigger a toast to tell the user to sign in
 		redirect("/auth");
 	}
 
 	const chatService = new ChatService(supabase);
-	const response = await chatService.getMessages(data.user.id);
 
-	console.log("response", response);
+	const [chat, response] = await Promise.all([
+		chatService.getChatByUserId(data.user.id),
+		chatService.getMessages(data.user.id),
+	]);
 
 	const messages = response?.map((m) => ({
 		id: m.id,
@@ -34,9 +35,13 @@ export default async function ChatLayout() {
 	}
 
 	return (
-		<ChatBot
-			initialMessages={messages || []}
-			initialAgentsByMessageId={initialAgentsByMessageId}
-		/>
+		<div className="bg-gradient-to-br from-zinc-800 via-zinc-900 to-indigo-950 min-h-svh w-full flex flex-col">
+			<ChatBot
+				chatTitle={chat?.title || "Chatbot"}
+				// initialMessages={messages || []}
+				initialMessages={[...messages, ...messages, ...messages]}
+				initialAgentsByMessageId={initialAgentsByMessageId}
+			/>
+		</div>
 	);
 }
