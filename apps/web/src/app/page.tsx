@@ -1,3 +1,4 @@
+import type { User } from "@supabase/supabase-js";
 import {
 	ArrowRight,
 	Bot,
@@ -11,9 +12,13 @@ import {
 import Link from "next/link";
 import { Button } from "@/components/ui";
 import { Card } from "@/components/ui/card";
+import { createClient } from "@/lib/supabase/server";
 import { signOutAction } from "./auth/action";
 
-export default function Home() {
+export default async function Home() {
+	const supabase = await createClient();
+	const { data: user } = await supabase.auth.getUser();
+
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-zinc-800 via-zinc-900 to-indigo-950 overflow-hidden">
 			{/* Header */}
@@ -33,18 +38,20 @@ export default function Home() {
 								size="sm"
 								className="bg-rose-500 hover:bg-rose-700"
 							>
-								<Link href="/auth">Get Started</Link>
+								<Link href="/chat">Get Started</Link>
 							</Button>
 
-							<Button
-								type="button"
-								className="bg-zinc-950 hover:bg-zinc-700"
-								size="sm"
-								onClick={signOutAction}
-							>
-								<LogOut className="mr-1" />
-								Logout
-							</Button>
+							{user.user && (
+								<Button
+									type="button"
+									className="bg-zinc-950 hover:bg-zinc-700"
+									size="sm"
+									onClick={signOutAction}
+								>
+									<LogOut className="mr-1" />
+									Logout
+								</Button>
+							)}
 						</div>
 					</nav>
 				</div>
@@ -89,7 +96,7 @@ export default function Home() {
 								size="lg"
 								className="group h-12 px-8 text-base hover:bg-accent"
 							>
-								<Link href="/auth">
+								<Link href="/chat">
 									<span className="mr-2">Start Chatting</span>
 									<ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
 								</Link>
@@ -237,7 +244,7 @@ export default function Home() {
 
 						<div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
 							<Button asChild size="lg" className="h-12 px-8 text-base">
-								<Link href="/auth">
+								<Link href="/chat">
 									<span className="mr-2">Get Started Free</span>
 									<Sparkles className="h-4 w-4" />
 								</Link>

@@ -77,6 +77,7 @@ export const AuthForm = ({ signInAction, signUpAction }: AuthFormProps) => {
 									type="email"
 									placeholder="Enter your email"
 									value={credentials.email}
+									className="border border-zinc-200"
 									onChange={(e) =>
 										setCredentials({ ...credentials, email: e.target.value })
 									}
@@ -90,6 +91,7 @@ export const AuthForm = ({ signInAction, signUpAction }: AuthFormProps) => {
 									type="password"
 									placeholder="Enter your password"
 									value={credentials.password}
+									className="border border-zinc-200"
 									onChange={(e) =>
 										setCredentials({ ...credentials, password: e.target.value })
 									}
@@ -111,6 +113,7 @@ export const AuthForm = ({ signInAction, signUpAction }: AuthFormProps) => {
 									type="email"
 									placeholder="Enter your email"
 									value={credentials.email}
+									className="border border-zinc-200"
 									onChange={(e) =>
 										setCredentials({ ...credentials, email: e.target.value })
 									}
@@ -124,6 +127,7 @@ export const AuthForm = ({ signInAction, signUpAction }: AuthFormProps) => {
 									type="password"
 									placeholder="Create a password"
 									value={credentials.password}
+									className="border border-zinc-200"
 									onChange={(e) =>
 										setCredentials({ ...credentials, password: e.target.value })
 									}
@@ -139,6 +143,7 @@ export const AuthForm = ({ signInAction, signUpAction }: AuthFormProps) => {
 									type="password"
 									placeholder="Confirm your password"
 									value={credentials.confirmPassword}
+									className="border border-zinc-200"
 									onChange={(e) =>
 										setCredentials({
 											...credentials,
