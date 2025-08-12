@@ -2,6 +2,7 @@
 
 import type { Message } from "@ai-sdk/react";
 import { Bot, Cloud, Newspaper } from "lucide-react";
+import { useEffect } from "react";
 import {
 	AnimatePresence,
 	BadgeMotion,
@@ -11,6 +12,7 @@ import {
 	MessageRowMotion,
 	ShimmerOnce,
 	StaggerText,
+	scrollToBottomSmooth,
 	TypingIndicatorMotion,
 } from "@/components/animation";
 import { Badge } from "@/components/ui/badge";
@@ -41,9 +43,20 @@ type MessagesProps = {
 export const MessagesList = (props: MessagesProps) => {
 	const { messages, agentsByMessageId, isLoading } = props;
 
+	useEffect(() => {
+		if (messages.length > 0) {
+			// Small delay to ensure the new message is rendered
+			const timeoutId = setTimeout(() => {
+				scrollToBottomSmooth(undefined, 800);
+			}, 100);
+
+			return () => clearTimeout(timeoutId);
+		}
+	}, [messages.length]);
+
 	return (
 		<div
-			className={`h-full w-full space-y-4 max-w-3xl mx-auto text-zinc-200 px-4 pt-4 pb-8 overflow-y-auto ${
+			className={`h-full w-full space-y-4 max-w-3xl mx-auto text-zinc-200 px-4 pt-4 pb-8 ${
 				messages.length ? "flex-1" : ""
 			}`}
 		>

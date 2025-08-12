@@ -183,4 +183,57 @@ export const StaggerText = ({ text, className }: StaggerTextProps) => {
 	);
 };
 
+// Smooth scroll to bottom utility - supports both elements and window
+export const scrollToBottomSmooth = (element?: HTMLElement, duration = 400) => {
+	if (!element) {
+		// If no element provided, scroll to bottom of page
+		const start = window.pageYOffset || document.documentElement.scrollTop;
+		const target =
+			Math.max(
+				document.body.scrollHeight,
+				document.documentElement.scrollHeight,
+			) - window.innerHeight;
+		const distance = target - start;
+		const startTime = performance.now();
+
+		const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
+
+		const animateScroll = (currentTime: number) => {
+			const elapsed = currentTime - startTime;
+			const progress = Math.min(elapsed / duration, 1);
+			const easeProgress = easeOutCubic(progress);
+
+			window.scrollTo(0, start + distance * easeProgress);
+
+			if (progress < 1) {
+				requestAnimationFrame(animateScroll);
+			}
+		};
+
+		requestAnimationFrame(animateScroll);
+		return;
+	}
+
+	const start = element.scrollTop;
+	const target = element.scrollHeight - element.clientHeight;
+	const distance = target - start;
+	const startTime = performance.now();
+
+	const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
+
+	const animateScroll = (currentTime: number) => {
+		const elapsed = currentTime - startTime;
+		const progress = Math.min(elapsed / duration, 1);
+		const easeProgress = easeOutCubic(progress);
+
+		element.scrollTop = start + distance * easeProgress;
+
+		if (progress < 1) {
+			requestAnimationFrame(animateScroll);
+		}
+	};
+
+	requestAnimationFrame(animateScroll);
+};
+
 export { motion, AnimatePresence };
