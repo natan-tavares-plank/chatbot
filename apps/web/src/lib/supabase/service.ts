@@ -11,7 +11,7 @@ export class ChatService {
 	async getChatByUserId(userId: string) {
 		const { data, error } = await this.supabase
 			.from("chats")
-			.select("*")
+			.select("title, turn, updated_at")
 			.eq("user_id", userId)
 			.single();
 
@@ -31,7 +31,11 @@ export class ChatService {
 			.select()
 			.single();
 
-		if (error) throw error;
+		if (error) {
+			console.error("Error saving chat session:", error);
+			throw error;
+		}
+
 		return data;
 	}
 
@@ -40,12 +44,13 @@ export class ChatService {
 		messages: Message[],
 		agentsForLastAssistant?: string[],
 	) {
+		if (messages.length === 0) return;
+
 		const existingMessages = await this.getMessages(chatId);
 		const existingContents = new Set(
-			existingMessages.map((msg) => msg.content),
+			existingMessages.map(({ content }) => content),
 		);
 
-		// Determine last assistant message content from the provided messages
 		const lastAssistant = [...messages]
 			.reverse()
 			.find((m) => m._getType() !== "human");
@@ -55,10 +60,13 @@ export class ChatService {
 				: JSON.stringify(lastAssistant.content)
 			: undefined;
 
+		let isAnswer = false;
 		const messagesToInsert = messages
 			.filter((msg) => msg.content.toString().trim())
 			.map((msg) => {
 				const role = msg._getType() === "human" ? "user" : "assistant";
+				isAnswer = role === "assistant";
+
 				const contentStr =
 					typeof msg.content === "string"
 						? msg.content
@@ -88,16 +96,23 @@ export class ChatService {
 			})
 			.filter((row) => !existingContents.has(row.content));
 
-		if (messagesToInsert.length === 0) {
-			return;
-		}
+		if (!messagesToInsert.length) return;
 
 		const { error } = await this.supabase
 			.from("messages")
 			.insert(messagesToInsert);
+		if (error) throw error;
 
-		if (error) {
-			throw error;
+		if (isAnswer) {
+			const { error: updateError } = await this.supabase.rpc(
+				"increment_chat_turn",
+				{ p_chat_id: chatId },
+			);
+
+			if (updateError) {
+				console.error("Error updating turn counter:", updateError);
+				throw updateError;
+			}
 		}
 	}
 
@@ -113,6 +128,8 @@ export class ChatService {
 	}
 
 	async saveSummary(chatId: string, summaryText: string) {
+		if (!summaryText.length) return;
+
 		const { error } = await this.supabase.from("summaries").upsert(
 			{ chat_id: chatId, summary_text: summaryText },
 			{ onConflict: "chat_id" }, // Use the unique constraint for proper upsert
@@ -134,19 +151,19 @@ export class ChatService {
 		return data?.summary_text || null;
 	}
 
-	async saveCheckpoint(threadId: string, _checkpoint: unknown) {
-		// You might want to add a checkpoints table for this
-		// For now, we'll store it as JSON in a simple way
-		const { error } = await this.supabase
-			.from("chats")
-			.update({
-				// You could add a checkpoint_data JSONB column to the chats table
-				updated_at: new Date().toISOString(),
-			})
-			.eq("user_id", threadId);
+	// async saveCheckpoint(threadId: string, _checkpoint: unknown) {
+	// 	// You might want to add a checkpoints table for this
+	// 	// For now, we'll store it as JSON in a simple way
+	// 	const { error } = await this.supabase
+	// 		.from("chats")
+	// 		.update({
+	// 			// You could add a checkpoint_data JSONB column to the chats table
+	// 			updated_at: new Date().toISOString(),
+	// 		})
+	// 		.eq("user_id", threadId);
 
-		if (error) throw error;
-	}
+	// 	if (error) throw error;
+	// }
 
 	async clearChat(chatId: string) {
 		const { error } = await this.supabase

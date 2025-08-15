@@ -1,12 +1,9 @@
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { SystemMessage } from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
 import z from "zod";
 import { env } from "../../../env";
 import { Agent, type ChatState } from "../types";
 
-/**
- * This is the base LLM that all agents use.
- */
 export const llm = new ChatOpenAI({
 	openAIApiKey: env.OPENAI_API_KEY,
 	model: "gpt-4o-mini",
@@ -21,20 +18,15 @@ export const llm = new ChatOpenAI({
 export const routerNode = async (state: ChatState) => {
 	const systemPrompt = new SystemMessage(
 		[
-			"Classify the user's query into one of the following: 'weather_agent', 'news_agent', 'chat_agent'.",
-			"Valid destinations are: 'weather_agent', 'news_agent', 'chat_agent'.",
-			"If the user asks about weather conditions, forecasts, or climate, direct them to the 'weather_agent'.",
-			"If the user asks about current events, news, or recent happenings, direct them to the 'news_agent'.",
-			"For general conversation asks, direct them to the 'chat_agent'.",
-			"You must return just the destination on the goto field.",
+			"Return only the destination in the 'goto' field as one of: 'weather_agent', 'news_agent', 'chat_agent'.",
+			"weather_agent: weather/forecast/temperature/precipitation/wind/climate (especially with location/time).",
+			"news_agent: current events, headlines, breaking/latest news across any domain.",
+			"chat_agent: everything else.",
+			"if you need to call a tool, you MUST call an agent to do it! you can never call a tool directly.",
 		].join(" "),
 	);
 
-	// Get the most recent human message (should be the current user input)
-	const humanMessages = state.messages.filter((m) => m instanceof HumanMessage);
-	const lastMessage = humanMessages[humanMessages.length - 1];
-
-	if (!lastMessage) {
+	if (!state.messages.length) {
 		return { goto: Agent.CHAT, agent_calls: { [Agent.CHAT]: 1 } };
 	}
 
@@ -44,11 +36,15 @@ export const routerNode = async (state: ChatState) => {
 			.describe("The next agent to call. Must be one of the specified values."),
 	});
 
-	const { goto } = await llm
+	const { goto } = await new ChatOpenAI({
+		model: "gpt-3.5-turbo",
+		temperature: 0,
+		openAIApiKey: env.OPENAI_API_KEY,
+	})
 		.withStructuredOutput(responseSchema, {
 			name: "router",
 		})
-		.invoke([systemPrompt, lastMessage]);
+		.invoke([systemPrompt, ...state.messages]);
 
 	return { goto, agent_calls: { [goto]: 1 } };
 };

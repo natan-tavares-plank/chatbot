@@ -8,7 +8,7 @@ export const newsTool = tool(
 	async ({ query }) => {
 		try {
 			const response = await fetch(
-				`${baseUrl}?q=${query}&apiKey=${env.NEWSAPI_API_KEY}&pageSize=5`,
+				`${baseUrl}?q=${query}&apiKey=${env.NEWSAPI_API_KEY}&pageSize=3`,
 			);
 
 			const data = await response.json();

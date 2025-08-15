@@ -20,7 +20,11 @@ export const weatherTool = tool(
 		description: "Call to get the weather data.",
 		returnDirect: true,
 		schema: z.object({
-			query: z.string().describe("The city to get the weather."),
+			query: z
+				.string()
+				.describe(
+					"The city or country to get the weather. not search for places, just the name of the city or country.",
+				),
 		}),
 		responseFormat: "content",
 	},

@@ -1,6 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import "@/lib/langgraph/langsmith";
-import { AIMessage, HumanMessage } from "@langchain/core/messages";
+import {
+	AIMessage,
+	HumanMessage,
+	SystemMessage,
+} from "@langchain/core/messages";
 import { UnauthorizedError } from "@/@errors";
 import { createAgentWithMemory } from "@/lib/langgraph/agent-factory";
 import type { StateAnnotation } from "@/lib/langgraph/graph";
@@ -9,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
+	const start = performance.now();
 	try {
 		const { auth } = await createClient();
 		const {
@@ -24,6 +29,8 @@ export async function POST(req: NextRequest) {
 				{ status: 401 },
 			);
 		}
+		const checkUserTime = performance.now() - start;
+		console.log("took to check user", checkUserTime);
 
 		const { messages } = await req.json();
 		if (!messages?.length) {
@@ -33,33 +40,38 @@ export async function POST(req: NextRequest) {
 			);
 		}
 
-		// Convert messages to LangChain format
-		const langChainMessages = messages.map(
-			(msg: { role: string; content: string; agent_name?: string }) =>
-				msg.role === "user"
-					? new HumanMessage(msg.content)
-					: new AIMessage({
-							content: msg.content,
-							name: msg.agent_name,
-						}),
-		);
+		// Convert ONLY the latest incoming message to LangChain format
+		const lastIncoming = messages[messages.length - 1] as
+			| { role: string; content: string; agent_name?: string }
+			| undefined;
+
+		const latestLangChainMessage = lastIncoming
+			? lastIncoming.role === "user"
+				? new HumanMessage(lastIncoming.content)
+				: new AIMessage({
+						content: lastIncoming.content,
+						name: lastIncoming.agent_name,
+					})
+			: undefined;
 
 		const { agent: currentAgent, memoryManager } = await createAgentWithMemory(
 			user.id,
 		);
 
-		// Load previous state from database
 		const previousState = await memoryManager.loadState();
-		if (previousState.messages?.length) {
-			langChainMessages.unshift(...previousState.messages);
-		}
+		const messagesForAgent = [
+			...(previousState.summary
+				? [new SystemMessage(previousState.summary)]
+				: []),
+			...(previousState.messages || []),
+			...(latestLangChainMessage ? [latestLangChainMessage] : []),
+		];
+		const loadPreviousStateTime = performance.now() - start - checkUserTime;
+		console.log("took to load previous state", loadPreviousStateTime);
 
 		// Non-streaming invocation: return JSON with content and involved agents
 		const finalState: typeof StateAnnotation.State = await currentAgent.invoke(
-			{
-				messages: langChainMessages,
-				summary: previousState.summary || "",
-			},
+			{ ...previousState, messages: messagesForAgent },
 			{
 				configurable: {
 					thread_id: user.id,
@@ -68,7 +80,9 @@ export async function POST(req: NextRequest) {
 			},
 		);
 
-		// Extract the final assistant content
+		const invokeAgentTime = performance.now() - start - loadPreviousStateTime;
+		console.log("took to invoke agent", invokeAgentTime);
+
 		const allMessages = Array.isArray(finalState?.messages)
 			? (finalState.messages as (AIMessage | HumanMessage)[])
 			: [];
@@ -81,6 +95,8 @@ export async function POST(req: NextRequest) {
 			? Object.keys(finalState.agent_calls)
 			: [];
 
+		console.log(`Time taken: ${performance.now() - start} milliseconds`);
+
 		return NextResponse.json({
 			content,
 			agents,
@@ -89,9 +105,10 @@ export async function POST(req: NextRequest) {
 		});
 	} catch (error) {
 		console.error("API error:", error);
-		return NextResponse.json(
-			{ error: "Internal server error" },
-			{ status: 500 },
-		);
+		const message =
+			(error as any)?.message ||
+			(error as any)?.toString?.() ||
+			"Internal server error";
+		return NextResponse.json({ error: message }, { status: 500 });
 	}
 }

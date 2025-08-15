@@ -16,6 +16,10 @@ import { llm } from "./agents";
 import type { StateAnnotation } from "./graph";
 
 export class MemoryManager extends BaseCheckpointSaver<string> {
+	// private static readonly BASE_MESSAGE_COUNT = 4;
+	// private static readonly MAX_TURN_INCREMENT = 10;
+	// private static readonly SUMMARY_THRESHOLD = 11;
+
 	private chatService: ChatService;
 
 	constructor(
@@ -24,10 +28,6 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 	) {
 		super();
 		this.chatService = new ChatService(supabase);
-	}
-
-	private async initChatService() {
-		return this.chatService;
 	}
 
 	async getTuple(config: RunnableConfig): Promise<CheckpointTuple | undefined> {
@@ -47,12 +47,12 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 	async put(
 		config: RunnableConfig,
 		checkpoint: Checkpoint,
-		metadata: Record<string, unknown>,
+		_metadata: Record<string, unknown>,
 	): Promise<RunnableConfig> {
 		try {
 			const threadId = config.configurable?.thread_id as string;
 			if (threadId) {
-				const chatService = await this.initChatService();
+				// const chatService = await this.initChatService();
 
 				// Extract state from checkpoint
 				if (checkpoint.channel_values) {
@@ -61,7 +61,7 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 				}
 
 				// Also save checkpoint metadata if needed
-				await chatService.saveCheckpoint(threadId, { checkpoint, metadata });
+				// await chatService.saveCheckpoint(threadId, { checkpoint, metadata });
 			}
 		} catch (error) {
 			console.error("Error in put method:", error);
@@ -102,41 +102,64 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 	async persistState(state: typeof StateAnnotation.State) {
 		try {
 			const { messages, summary, agent_calls } = state;
-			const chatService = await this.initChatService();
-			await chatService.saveChatSession(this.threadId);
+			// const chatService = await this.initChatService();
+			// await this.chatService.saveChatSession(this.threadId);
 
-			if (messages && messages.length > 0) {
-				// Determine agents for the last assistant message from agent_calls keys
-				const agentsForLastAssistant = agent_calls
-					? Object.keys(agent_calls)
-					: undefined;
-				await chatService.saveMessages(
+			Promise.all([
+				this.chatService.saveChatSession(this.threadId),
+				this.chatService.saveMessages(
 					this.threadId,
 					messages,
-					agentsForLastAssistant,
-				);
-			}
+					Object.keys(agent_calls),
+				),
+				this.chatService.saveSummary(this.threadId, summary),
+			]);
 
-			if (summary) {
-				await chatService.saveSummary(this.threadId, summary);
-			}
+			// if (messages && messages.length > 0) {
+			// 	// Determine agents for the last assistant message from agent_calls keys
+			// 	const agentsForLastAssistant = agent_calls
+			// 		? Object.keys(agent_calls)
+			// 		: undefined;
+			// 	await this.chatService.saveMessages(
+			// 		this.threadId,
+			// 		messages,
+			// 		agentsForLastAssistant,
+			// 	);
+			// }
+
+			// if (summary) {
+			// 	await chatService.saveSummary(this.threadId, summary);
+			// }
 		} catch (error) {
+			console.error("Error persisting state:", error);
 			throw error;
 		}
 	}
 
 	async loadState(): Promise<Partial<typeof StateAnnotation.State>> {
 		try {
-			const chatService = await this.initChatService();
-
-			const [allMessages, summary] = await Promise.all([
-				chatService.getMessages(this.threadId),
-				chatService.getSummary(this.threadId),
+			const [chat, allMessages, summary] = await Promise.all([
+				this.chatService.getChatByUserId(this.threadId),
+				this.chatService.getMessages(this.threadId),
+				this.chatService.getSummary(this.threadId),
 			]);
 
-			const messagesToLoad = summary ? allMessages.slice(-5) : allMessages;
+			const turn = chat?.turn ?? 1;
+			let messagesToLoad = [] as typeof allMessages;
+			if (summary) {
+				const numMessages = 6 + ((turn - 1) % 5);
+				for (const msg of allMessages) {
+					messagesToLoad.push(msg);
+					if (messagesToLoad.length >= numMessages) {
+						break;
+					}
+				}
+			} else {
+				messagesToLoad = allMessages;
+			}
 
-			return {
+			const state = {
+				turn: turn + 1,
 				messages: messagesToLoad.map((msg) => {
 					if (msg.role === "user") {
 						return new HumanMessage(msg.content);
@@ -146,6 +169,8 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 				}),
 				summary: summary || "",
 			};
+
+			return state;
 		} catch (error) {
 			console.error("Error loading state:", error);
 			return {};
@@ -165,61 +190,62 @@ export class MemoryManager extends BaseCheckpointSaver<string> {
 			console.error("Error clearing state:", err);
 		}
 	}
-}
 
-// Export the summarizeMessages function for use in the graph
-export async function summarizeMessages(state: typeof StateAnnotation.State) {
-	const { summary, messages } = state;
+	public static async summarizeMessages(state: typeof StateAnnotation.State) {
+		const { summary, messages } = state;
 
-	if (messages.length < 8) {
-		return state;
+		// const threshold = summary.length
+		// 	? MemoryManager.SUMMARY_THRESHOLD
+		// 	: MemoryManager.MAX_TURN_INCREMENT;
+
+		// if (messages.length < threshold) {
+		// 	return state;
+		// }
+
+		let summaryMessage = "";
+		if (summary) {
+			summaryMessage =
+				`This is summary of the conversation to date: ${summary}\n\n` +
+				"The summary should be really concise and to the point, try to keep it short.\n\n" +
+				"Add the new messages to the summary by taking into account the new messages above:";
+		} else {
+			summaryMessage = "Create a summary of the conversation above:";
+		}
+
+		const allMessages = [
+			...messages,
+			new HumanMessage({
+				id: state?.messages[0]?.id || "unknown",
+				content: summaryMessage,
+			}),
+		];
+
+		const responseSchema = z.object({
+			summary: z.string().describe("The summary of the conversation"),
+		});
+
+		const response = await llm
+			.withStructuredOutput(responseSchema, {
+				name: "summarize_conversation",
+			})
+			.invoke(allMessages);
+
+		if (typeof response.summary !== "string") {
+			throw new Error("Expected a string response from the model");
+		}
+
+		const recentMessages = messages.slice(-5);
+		const messagesToRemoveFromState = messages.slice(0, -5);
+
+		const removeFromState = messagesToRemoveFromState.map(
+			(msg) => new RemoveMessage({ id: msg.id || "unknown" }),
+		);
+
+		return {
+			...state,
+			summary: response.summary,
+			messages: [...removeFromState, ...recentMessages],
+			goto: "__end__",
+		};
 	}
-
-	let summaryMessage = "";
-	if (summary) {
-		summaryMessage =
-			`This is summary of the conversation to date: ${summary}\n\n` +
-			"Extend the summary by taking into account the new messages above:";
-	} else {
-		summaryMessage = "Create a summary of the conversation above:";
-	}
-
-	const allMessages = [
-		...messages,
-		new HumanMessage({
-			id: state?.messages[0]?.id || "unknown",
-			content: summaryMessage,
-		}),
-	];
-
-	const responseSchema = z.object({
-		summary: z.string().describe("The summary of the conversation"),
-	});
-
-	const response = await llm
-		.withStructuredOutput(responseSchema, {
-			name: "summarize_conversation",
-		})
-		.invoke(allMessages);
-
-	if (typeof response.summary !== "string") {
-		throw new Error("Expected a string response from the model");
-	}
-
-	const recentMessages = messages.slice(-5);
-	const messagesToRemoveFromState = messages.slice(0, -5);
-
-	const removeFromState = messagesToRemoveFromState.map(
-		(msg) => new RemoveMessage({ id: msg.id || "unknown" }),
-	);
-
-	return {
-		...state,
-		summary: response.summary,
-		messages: [...removeFromState, ...recentMessages],
-		// goto: state.goto,
-		// weather_data: state.weather_data,
-		// news_data: state.news_data,
-		// agent_calls: state.agent_calls,
-	};
 }

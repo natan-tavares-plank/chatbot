@@ -8,7 +8,7 @@ import { routerNode } from "./agents";
 import { chatAgent } from "./agents/chat.agent";
 import { newsAgent } from "./agents/news.agent";
 import { weatherAgent } from "./agents/weather.agent";
-import { summarizeMessages } from "./memory-manager";
+import { MemoryManager } from "./memory-manager";
 
 export const StateAnnotation = Annotation.Root({
 	...MessagesAnnotation.spec,
@@ -39,11 +39,15 @@ export const StateAnnotation = Annotation.Root({
 		value: (_, update) => update,
 		default: () => "",
 	}),
+	turn: Annotation<number>({
+		value: (_, update) => update,
+		default: () => 0,
+	}),
 });
 
 const graph = new StateGraph(StateAnnotation)
 	.addNode("router", routerNode)
-	.addNode("summarize_conversation", summarizeMessages)
+	.addNode("summarize_conversation", MemoryManager.summarizeMessages)
 
 	// Agent nodes
 	.addNode("chat_agent", chatAgent)
@@ -66,7 +70,10 @@ const graph = new StateGraph(StateAnnotation)
 	.addConditionalEdges(
 		"chat_agent",
 		(state) => {
-			return state.messages?.length >= 8 ? "summarize_conversation" : "__end__";
+			const turn = state.turn ?? 1;
+			const shouldSummarize = turn >= 10 && turn % 5 === 0;
+
+			return shouldSummarize ? "summarize_conversation" : "__end__";
 		},
 		{
 			summarize_conversation: "summarize_conversation",
@@ -80,6 +87,8 @@ export function createAgent(memoryManager?: MemorySaver) {
 	return graph.compile({
 		checkpointer: memoryManager || new MemorySaver(),
 	});
+
+	// return graph.compile();
 }
 
 // Default agent with MemorySaver for backward compatibility

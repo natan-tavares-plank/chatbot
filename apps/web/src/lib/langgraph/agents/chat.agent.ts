@@ -1,4 +1,8 @@
-import { AIMessage, SystemMessage } from "@langchain/core/messages";
+import {
+	AIMessage,
+	HumanMessage,
+	SystemMessage,
+} from "@langchain/core/messages";
 import { Command } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
 import z from "zod";
@@ -12,55 +16,61 @@ const llm = new ChatOpenAI({
 });
 
 const systemPrompt = [
-	"You are Captain Byte, an funny pirate with a crew of specialists.",
-	"You are witty, entertaining, and extremely verbose in your responses.",
-	"Always maintain your pirate character while being helpful.",
-	"Use nautical metaphors and pirate terminology when appropriate.",
-	"You are the final agent in the chain. You will be given the weather and news data and you will use it to provide a final response.",
-	"When given news data, summarize the news in your pirate style and provide insights.",
-	"When given weather data, describe the weather conditions in your pirate style.",
+	"You are Captain Byte, a witty pirate assistant.",
+	"Stay in character, be helpful, and use nautical flair.",
+	"You are the final agent: if weather/news context is provided, use it to answer accurately.",
 ].join(" ");
 
+const responseSchema = z.object({
+	response: z
+		.string()
+		.min(1, "Response cannot be empty")
+		.describe(
+			"A helpful answer with a bit more detail (more or less than 200 words) in Captain Byte's pirate style. Use provided weather/news context when available.",
+		),
+});
+
 export const chatAgent = async (state: ChatState): Promise<Command> => {
-	let contextualPrompt = systemPrompt;
-
-	// the model should be able to choose to use the weather and news data or not
-	if (state.weather_data) {
-		contextualPrompt += ` Weather information has been gathered: ${state.weather_data}. Use this information to provide an accurate weather response.`;
-	}
-
-	if (state.news_data) {
-		contextualPrompt += ` News information has been gathered: ${state.news_data}. Use this information to provide an accurate news response.`;
-	}
-
-	const recentMessages = state.messages.slice(-4);
-	const messagesToSend = [new SystemMessage(contextualPrompt)];
+	const contextualPrompt = systemPrompt;
+	const messagesToSend: Array<SystemMessage | HumanMessage | AIMessage> = [
+		new SystemMessage(contextualPrompt),
+	];
 
 	if (state.summary) {
 		messagesToSend.push(
-			new AIMessage({
-				content: `CONVERSATION CONTEXT: ${state.summary}`,
-				name: "context",
-			}),
+			new SystemMessage(`CONVERSATION CONTEXT:\n${state.summary}`),
 		);
 	}
 
-	messagesToSend.push(
-		...recentMessages.filter((msg) => msg.content.toString().trim()),
-	);
+	if (state.weather_data) {
+		messagesToSend.push(
+			new SystemMessage(`WEATHER DATA:\n${state.weather_data}`),
+		);
+	}
 
-	const responseSchema = z.object({
-		response: z
-			.string()
-			.min(1, "Response cannot be empty")
-			.describe(
-				"A human readable response to the original question. You must provide a detailed, helpful response using the available information. Be verbose and entertaining as Captain Byte.",
-			),
-	});
+	if (state.news_data) {
+		messagesToSend.push(new SystemMessage(`NEWS DATA:\n${state.news_data}`));
+	}
 
-	let response: { response: string };
+	// Rebuild conversation with human + assistant text (skip assistant tool_calls)
+	for (const msg of state.messages) {
+		const maybeToolCalls = (msg as any)?.additional_kwargs?.tool_calls;
+		if (Array.isArray(maybeToolCalls) && maybeToolCalls.length > 0) {
+			continue;
+		}
+		const content = (msg as HumanMessage | AIMessage).content as unknown;
+		const contentStr = String(content ?? "").trim();
+		if (!contentStr) continue;
+		if (msg instanceof HumanMessage) {
+			messagesToSend.push(new HumanMessage(contentStr));
+		} else if (msg instanceof AIMessage) {
+			messagesToSend.push(new AIMessage({ content: contentStr }));
+		}
+	}
+
+	let result: { response: string };
 	try {
-		response = await llm
+		result = await llm
 			.withStructuredOutput(responseSchema, {
 				name: "chat_agent",
 			})
@@ -71,35 +81,26 @@ export const chatAgent = async (state: ChatState): Promise<Command> => {
 			error,
 		);
 
-		const fallbackResponse = await llm.invoke(messagesToSend);
-		const fallbackContent = String(fallbackResponse.content || "");
-		if (fallbackContent.trim()) {
-			response = {
-				response: fallbackContent,
-			};
-		} else {
-			let defaultResponse =
-				"Arr matey! I seem to have lost me bearings. Could ye repeat that question?";
+		let defaultResponse =
+			"Arr matey! I seem to have lost me bearings. Could ye repeat that question?";
 
-			if (state.news_data) {
-				defaultResponse = `Ahoy there! I've gathered some news from the high seas of information: ${state.news_data}. These be the latest tidings from London, me hearties!`;
-			} else if (state.weather_data) {
-				defaultResponse = `Shiver me timbers! Here's the weather report from the meteorological seas: ${state.weather_data}. May the winds be ever in your favor!`;
-			}
-
-			response = {
-				response: defaultResponse,
-			};
+		if (state.news_data) {
+			defaultResponse = `Ahoy! Fresh tidings be fetched: ${state.news_data}`;
+		} else if (state.weather_data) {
+			defaultResponse = `Shiver me timbers! The skies report: ${state.weather_data}`;
 		}
+
+		result = {
+			response: defaultResponse,
+		};
 	}
 
 	const aiMessage = new AIMessage({
-		content: response.response,
+		content: result.response,
 		name: "chat_agent",
 	});
 
 	return new Command({
-		// goto: "summarize_conversation",
 		update: {
 			messages: [aiMessage],
 			agent_calls: {
