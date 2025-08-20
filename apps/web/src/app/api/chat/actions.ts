@@ -1,4 +1,5 @@
 "use server";
+import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { ChatService } from "@/lib/supabase/service";
 
@@ -20,3 +21,17 @@ export async function clearChatAction() {
 
 	return { error: null };
 }
+
+export const verifyUser = async (): Promise<{
+	authenticated: boolean;
+	user: User | null;
+}> => {
+	const { auth } = await createClient();
+	const {
+		data: { user },
+	} = await auth.getUser();
+	if (!user?.id) {
+		return { authenticated: false, user: null };
+	}
+	return { authenticated: true, user };
+};

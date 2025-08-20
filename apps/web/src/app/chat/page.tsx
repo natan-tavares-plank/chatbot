@@ -7,6 +7,10 @@ export default async function Page() {
 	const supabase = await createClient();
 	const { data } = await supabase.auth.getUser();
 
+	if (!data?.user) {
+		return <div>Unauthorized</div>;
+	}
+
 	const chatService = new ChatService(supabase);
 
 	const [chat, response] = await Promise.all([
@@ -39,6 +43,7 @@ export default async function Page() {
 	return (
 		<div className="bg-gradient-to-br from-zinc-800 via-zinc-900 to-indigo-950 min-h-svh w-full flex flex-col">
 			<ChatBot
+				userId={data.user.id}
 				chatTitle={chat?.title || "Chatbot"}
 				initialMessages={messages || []}
 				initialAgentsByMessageId={initialAgentsByMessageId}

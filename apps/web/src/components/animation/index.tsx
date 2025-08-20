@@ -143,12 +143,40 @@ export const ShimmerOnce = () => (
 );
 
 // Per-word staggered text reveal
-type StaggerTextProps = { text: string; className?: string };
-export const StaggerText = ({ text, className }: StaggerTextProps) => {
+type StaggerTextProps = { text?: string; className?: string };
+export const StaggerText = ({ text = "", className }: StaggerTextProps) => {
 	const parts = React.useMemo(() => {
-		const matches = Array.from(text.matchAll(/(\s+|\S+)/g));
-		return matches.map((m) => ({ value: m[0], start: m.index ?? 0 }));
+		// Split by newlines first, then by words
+		const lines = text.split("\n");
+		const allParts: Array<{
+			value: string;
+			start: number;
+			isNewline: boolean;
+		}> = [];
+		let currentIndex = 0;
+
+		lines.forEach((line, lineIndex) => {
+			if (lineIndex > 0) {
+				// Add newline character
+				allParts.push({ value: "\n", start: currentIndex, isNewline: true });
+				currentIndex++;
+			}
+
+			// Split line into words
+			const matches = Array.from(line.matchAll(/(\s+|\S+)/g));
+			matches.forEach((m) => {
+				allParts.push({
+					value: m[0],
+					start: currentIndex,
+					isNewline: false,
+				});
+				currentIndex += m[0].length;
+			});
+		});
+
+		return allParts;
 	}, [text]);
+
 	const containerVariants: Variants = {
 		visible: { transition: { staggerChildren: 0.012 } },
 	};
@@ -160,26 +188,32 @@ export const StaggerText = ({ text, className }: StaggerTextProps) => {
 			transition: { type: "spring", stiffness: 240, damping: 26 },
 		},
 	};
+
 	return (
-		<motion.p
+		<motion.div
 			className={className}
 			variants={containerVariants}
 			initial="hidden"
 			animate="visible"
 		>
-			{parts.map((segment) => (
-				<motion.span
-					key={segment.start}
-					variants={wordVariants}
-					style={{
-						display: "inline-block",
-						whiteSpace: segment.value.trim() ? "normal" : "pre",
-					}}
-				>
-					{segment.value}
-				</motion.span>
-			))}
-		</motion.p>
+			{parts.map((segment, index) =>
+				segment.isNewline ? (
+					// biome-ignore lint/suspicious/noArrayIndexKey: <idk>
+					<br key={`newline-${index}`} />
+				) : (
+					<motion.span
+						key={`word-${segment.start}-${index}`}
+						variants={wordVariants}
+						style={{
+							display: "inline-block",
+							whiteSpace: segment.value.trim() ? "normal" : "pre",
+						}}
+					>
+						{segment.value}
+					</motion.span>
+				),
+			)}
+		</motion.div>
 	);
 };
 

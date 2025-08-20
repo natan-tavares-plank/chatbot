@@ -95,7 +95,7 @@ export default async function Home() {
 								size="lg"
 								className="group h-12 px-8 text-base hover:bg-accent"
 							>
-								<Link href="/chat">
+								<Link href="/chat" prefetch>
 									<span className="mr-2">Start Chatting</span>
 									<ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
 								</Link>
@@ -106,7 +106,7 @@ export default async function Home() {
 								asChild
 								className="group h-12 px-8 text-base bg-zinc-800 hover:bg-zinc-700"
 							>
-								<Link href="/chat">
+								<Link href="/chat" prefetch>
 									<PlayCircle className="h-4 w-4 mr-2" />
 									<span>Watch Demo</span>
 								</Link>
@@ -243,7 +243,7 @@ export default async function Home() {
 
 						<div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
 							<Button asChild size="lg" className="h-12 px-8 text-base">
-								<Link href="/chat">
+								<Link href="/chat" prefetch>
 									<span className="mr-2">Get Started Free</span>
 									<Sparkles className="h-4 w-4" />
 								</Link>
@@ -253,7 +253,7 @@ export default async function Home() {
 								asChild
 								className="h-12 px-8 text-base bg-zinc-800 hover:bg-zinc-700"
 							>
-								<Link href="/chat">
+								<Link href="/chat" prefetch>
 									<PlayCircle className="h-4 w-4 mr-2" />
 									<span>Try Demo</span>
 								</Link>
